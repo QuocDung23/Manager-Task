@@ -1,6 +1,6 @@
 import { ConflictException, HttpResponseBodySuccessDto } from "@/common";
 import { AuthRepository } from "./auth.repository";
-import { RegisterDtos } from "./dtos/requests/register.req";
+import { RegisterRequestDto } from "./dtos/requests/register.req";
 import { AccountResDto } from "./dtos/responses/account.res";
 import { Exception } from "@tsed/exceptions";
 import { genSalt, hash } from "bcrypt";
@@ -10,7 +10,7 @@ export class AuthService {
   constructor(private readonly authRepository = new AuthRepository()) {}
 
   async register(
-    registerDto: RegisterDtos,
+    registerDto: RegisterRequestDto,
   ): Promise<HttpResponseBodySuccessDto<AccountResDto> | Exception> {
     const user = await this.authRepository.findAccount({
       email: registerDto.email,

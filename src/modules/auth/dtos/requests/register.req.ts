@@ -1,7 +1,7 @@
 import { ZodValidationSchema } from '@/common';
 import z, { email } from "zod"
 
-export class RegisterDtos {
+export class RegisterRequestDto {
     email: string
     password: string
     confirmPassword: string

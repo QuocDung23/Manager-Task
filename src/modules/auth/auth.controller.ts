@@ -1,9 +1,9 @@
 import { Exception } from "@tsed/exceptions";
 import { AuthService } from "./auth.service";
-import { RegisterDtos } from "./dtos/requests/register.req";
 import { HttpResponseDto } from "@/common";
 import { AccountResDto } from "./dtos/responses/account.res";
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response } from 'express';
+import { RegisterRequestDto } from "./dtos/requests";
 
 
 export class AuthController {
@@ -11,12 +11,24 @@ export class AuthController {
        private readonly authService = new AuthService()
     ) {}
 
-    async register(req: Request): Promise<Response> {
-        const regiterDto = req.body as RegisterDtos
-        const result = await this.authService.register(regiterDto)
-        if(result instanceof Exception) {
-            return new HttpResponseDto().exception(result)
+    
+    async register(req: Request, res: Response): Promise<Response> {
+        try {
+            const registerDto = req.body as RegisterRequestDto; // (hoặc RegisterDtos)
+            const result = await this.authService.register(registerDto);
+            
+            if (result instanceof Exception) {
+                return new HttpResponseDto().exception(res, result);
+            }
+            
+            return new HttpResponseDto().created<AccountResDto>(res, result);
+
+        } catch (error: any) {
+            console.error("System Error in Register:", error);
+            return res.status(500).json({
+                success: false,
+                message: "Internal Server Error"
+            });
         }
-        return new HttpResponseDto().created<AccountResDto>(result)
     }
 }
