@@ -30,5 +30,5 @@ app.use(openAPIRouter);
 
 app.listen(appEnv.PORT, () => {
   const { NODE_ENV, HOST, PORT } = appEnv;
-  console.log(`Server (${NODE_ENV}) running on port http://${HOST}:${PORT}`);
+  console.log(`Server (${NODE_ENV}) running on port http://${HOST}:${PORT}/api`);
 });

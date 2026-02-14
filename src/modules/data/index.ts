@@ -8,7 +8,7 @@
 import { Prisma } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
-import { PrismaService } from './prisma.service';
+import { PrismaService } from './prisma.client';
 
 // import { createSystemChatBoxSpoke } from "./seeds";
 

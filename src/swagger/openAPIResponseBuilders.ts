@@ -1,18 +1,27 @@
+import { extendZodWithOpenApi, ResponseConfig } from '@asteasolutions/zod-to-openapi';
+import { ReferenceObject } from '@asteasolutions/zod-to-openapi/dist/types';
 import { StatusCodes } from 'http-status-codes';
 import { z } from 'zod';
+
 import { ServiceResponseSchema } from '../common';
-import { HttpResponseBodySuccessDtoSchema } from '../common/dtos/httpResponseBodySuccess.dto';
 
+extendZodWithOpenApi(z);
 
-export function createApiResponse(schema: z.ZodTypeAny | null, description: string, statusCode = StatusCodes.OK) {
-  return {
-    [statusCode]: {
-      description,
-      content: {
-        'application/json': {
-          schema: ServiceResponseSchema(schema),
-        },
-      },
-    },
-  };
-}
+export const createApiResponse = (
+	schema: z.ZodTypeAny | null,
+	description: string,
+	statusCode = StatusCodes.OK,
+): {
+	[statusCode: string]: ResponseConfig | ReferenceObject;
+} => {
+	return {
+		[statusCode]: {
+			description,
+			content: {
+				'application/json': {
+					schema: ServiceResponseSchema(schema),
+				},
+			},
+		},
+	};
+};
