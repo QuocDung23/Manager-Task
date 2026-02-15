@@ -1,7 +1,6 @@
 import { accountsWithPartialRelations } from "@/models"
 import { UserStatus } from "@prisma/client"
-import { verify } from "node:crypto"
-import z, { email } from "zod"
+import z from "zod"
 
 export class AccountResDto {
     id: string
@@ -26,11 +25,11 @@ export class AccountResDto {
 }
 
 export const accountResDtoSchema = z.object ({
-    id: z.uuid(),
-    email: z.email(),
+    id: z.string(),
+    email: z.string().email(),
     name: z.string(),
-    avatar: z.url(),
+    avatar: z.string().url(),
     bio: z.string(),
     verify: z.boolean(),
-    status: z.enum(UserStatus)
+    status: z.enum([UserStatus.ACTIVE, UserStatus.LOCKED])
 })

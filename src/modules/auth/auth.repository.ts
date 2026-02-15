@@ -1,6 +1,6 @@
 import { accountsWithPartialRelations } from "@/models";
-import { Prisma, UserStatus } from "@prisma/client";
-import { PrismaService } from "../data";
+import { tokens, UserStatus } from "@prisma/client";
+import { Prisma, PrismaService } from "../data";
 
 export class AuthRepository {
     constructor( private readonly prismaService = new PrismaService() ) {}
@@ -37,5 +37,28 @@ export class AuthRepository {
             },
             data: accounts
         })
+    }
+
+	async createToken({ token }: { token: Prisma.tokensCreateInput }): Promise<tokens> {
+        const userId = token.user?.connect?.id;
+
+        if (!userId) {
+            throw new Error("User ID is required to create token");
+        }
+
+        return this.prismaService.tokens.upsert({
+            where: { 
+                userId: userId 
+            },
+            update: { 
+                refreshToken: token.refreshToken 
+            },
+            create: {
+                refreshToken: token.refreshToken,
+                user: {
+                    connect: { id: userId }
+                }
+            }
+        });
     }
 }

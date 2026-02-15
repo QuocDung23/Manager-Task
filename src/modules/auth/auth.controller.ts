@@ -3,7 +3,7 @@ import { AuthService } from "./auth.service";
 import { HttpResponseDto } from "@/common";
 import { AccountResDto } from "./dtos/responses/account.res";
 import { Request, Response } from 'express';
-import { RegisterRequestDto } from "./dtos/requests";
+import { LoginRequestDto, RegisterRequestDto } from "./dtos/requests";
 
 
 export class AuthController {
@@ -31,4 +31,13 @@ export class AuthController {
             });
         }
     }
+
+    async login(req: Request, res: Response): Promise<Response> {
+		const loginDto = req.body as LoginRequestDto;
+		const result = await this.authService.login(loginDto);
+		if (result instanceof Exception) {
+			return new HttpResponseDto().exception(res,result);
+		}
+		return new HttpResponseDto().success(res, result);
+	}
 }
