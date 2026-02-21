@@ -8,8 +8,7 @@ export class GetUserResponseDto {
     email: string
     bio: string | null | undefined
     avatar: string | null | undefined
-    address: string | null | undefined
-    phone: string | null | undefined
+
 
     updatedAt: Date | null | undefined
     createddAt: Date | null | undefined
@@ -22,8 +21,6 @@ export class GetUserResponseDto {
         this.email = userInfo.email
         this.bio = userInfo.bio 
         this.avatar = userInfo.avatar
-        this.address = userInfo.address
-        this.phone = userInfo.phone
 
         this.updatedAt = userInfo.updatedAt
         this.createddAt = userInfo.createdAt
@@ -38,8 +35,7 @@ export const getUserResponseSchema = z.object({
     email: z.email(),
     bio: z.string().optional(),
     avatar: z.string().optional(),
-    address: z.string().optional(),
-    phone: z.string().optional(),
+
 
     updatedAt: z.date(),
     createdAt: z.date(),
