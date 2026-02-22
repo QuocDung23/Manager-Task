@@ -9,8 +9,18 @@ import {
 import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import { accountResDtoSchema } from "./dtos/responses/account.res";
 import { StatusCodes } from "http-status-codes";
-import { loginRequestSchema, loginRequestValidationSchema } from "./dtos/requests";
+import {
+  loginRequestSchema,
+  loginRequestValidationSchema,
+  sendOtpRequestSchema,
+  sendOtpRequestValidationSchema,
+} from "./dtos/requests";
 import { loginResponseDtoSchema } from "./dtos/responses";
+import z from "zod";
+import {
+  verifyRequestSchema,
+  verifyRequestValidationSchema,
+} from "./dtos/requests/verifyOtp.req";
 
 export const authRegistry = new OpenAPIRegistry();
 
@@ -40,7 +50,38 @@ authRegistry.registerPath({
   path: "/auth/login",
   tags: ["Auth"],
   request: loginRequestSchema,
-  responses: createApiResponse(loginResponseDtoSchema, 'Success'),
+  responses: createApiResponse(loginResponseDtoSchema, "Success"),
 });
-router.post('/login', validateRequestMiddleware(loginRequestValidationSchema), authController.login)
+router.post(
+  "/login",
+  validateRequestMiddleware(loginRequestValidationSchema),
+  authController.login,
+);
+
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/sendOtp",
+  tags: ["Auth"],
+  request: sendOtpRequestSchema,
+  responses: createApiResponse(z.null(), "Success"),
+});
+router.post(
+  "/sendOtp",
+  validateRequestMiddleware(sendOtpRequestValidationSchema),
+  authController.sendOtp,
+);
+
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/verify",
+  tags: ["Auth"],
+  request: verifyRequestSchema,
+  responses: createApiResponse(accountResDtoSchema, "Success"),
+});
+router.post(
+  "/verify",
+  validateRequestMiddleware(verifyRequestValidationSchema),
+  authController.verify,
+);
+
 export const authRouter = router;

@@ -48,7 +48,7 @@ export class OtpRepository {
     });
   }
 
-  async deleteOtp(otpId: string): Promise<otps> {
+  async deleteOtp({ otpId }: { otpId: string }): Promise<otps> {
     return this.prismaService.otps.delete({
       where: { id: otpId },
     });
