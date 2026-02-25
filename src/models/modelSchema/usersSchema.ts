@@ -4,6 +4,8 @@ import { accountsWithRelationsSchema, accountsPartialWithRelationsSchema, accoun
 import type { accountsWithRelations, accountsPartialWithRelations, accountsOptionalDefaultsWithRelations } from './accountsSchema'
 import { tokensWithRelationsSchema, tokensPartialWithRelationsSchema, tokensOptionalDefaultsWithRelationsSchema } from './tokensSchema'
 import type { tokensWithRelations, tokensPartialWithRelations, tokensOptionalDefaultsWithRelations } from './tokensSchema'
+import { otpsWithRelationsSchema, otpsPartialWithRelationsSchema, otpsOptionalDefaultsWithRelationsSchema } from './otpsSchema'
+import type { otpsWithRelations, otpsPartialWithRelations, otpsOptionalDefaultsWithRelations } from './otpsSchema'
 
 /////////////////////////////////////////
 // USERS SCHEMA
@@ -55,6 +57,7 @@ export type usersOptionalDefaults = z.infer<typeof usersOptionalDefaultsSchema>
 export type usersRelations = {
   accounts?: accountsWithRelations | null;
   tokens: tokensWithRelations[];
+  otp?: otpsWithRelations | null;
 };
 
 export type usersWithRelations = z.infer<typeof usersSchema> & usersRelations
@@ -62,6 +65,7 @@ export type usersWithRelations = z.infer<typeof usersSchema> & usersRelations
 export const usersWithRelationsSchema: z.ZodType<usersWithRelations> = usersSchema.merge(z.object({
   accounts: z.lazy(() => accountsWithRelationsSchema).nullish(),
   tokens: z.lazy(() => tokensWithRelationsSchema).array(),
+  otp: z.lazy(() => otpsWithRelationsSchema).nullish(),
 }))
 
 /////////////////////////////////////////
@@ -71,6 +75,7 @@ export const usersWithRelationsSchema: z.ZodType<usersWithRelations> = usersSche
 export type usersOptionalDefaultsRelations = {
   accounts?: accountsOptionalDefaultsWithRelations | null;
   tokens: tokensOptionalDefaultsWithRelations[];
+  otp?: otpsOptionalDefaultsWithRelations | null;
 };
 
 export type usersOptionalDefaultsWithRelations = z.infer<typeof usersOptionalDefaultsSchema> & usersOptionalDefaultsRelations
@@ -78,6 +83,7 @@ export type usersOptionalDefaultsWithRelations = z.infer<typeof usersOptionalDef
 export const usersOptionalDefaultsWithRelationsSchema: z.ZodType<usersOptionalDefaultsWithRelations> = usersOptionalDefaultsSchema.merge(z.object({
   accounts: z.lazy(() => accountsOptionalDefaultsWithRelationsSchema).nullish(),
   tokens: z.lazy(() => tokensOptionalDefaultsWithRelationsSchema).array(),
+  otp: z.lazy(() => otpsOptionalDefaultsWithRelationsSchema).nullish(),
 }))
 
 /////////////////////////////////////////
@@ -87,6 +93,7 @@ export const usersOptionalDefaultsWithRelationsSchema: z.ZodType<usersOptionalDe
 export type usersPartialRelations = {
   accounts?: accountsPartialWithRelations | null;
   tokens?: tokensPartialWithRelations[];
+  otp?: otpsPartialWithRelations | null;
 };
 
 export type usersPartialWithRelations = z.infer<typeof usersPartialSchema> & usersPartialRelations
@@ -94,6 +101,7 @@ export type usersPartialWithRelations = z.infer<typeof usersPartialSchema> & use
 export const usersPartialWithRelationsSchema: z.ZodType<usersPartialWithRelations> = usersPartialSchema.merge(z.object({
   accounts: z.lazy(() => accountsPartialWithRelationsSchema).nullish(),
   tokens: z.lazy(() => tokensPartialWithRelationsSchema).array(),
+  otp: z.lazy(() => otpsPartialWithRelationsSchema).nullish(),
 })).partial()
 
 export type usersOptionalDefaultsWithPartialRelations = z.infer<typeof usersOptionalDefaultsSchema> & usersPartialRelations
@@ -101,6 +109,7 @@ export type usersOptionalDefaultsWithPartialRelations = z.infer<typeof usersOpti
 export const usersOptionalDefaultsWithPartialRelationsSchema: z.ZodType<usersOptionalDefaultsWithPartialRelations> = usersOptionalDefaultsSchema.merge(z.object({
   accounts: z.lazy(() => accountsPartialWithRelationsSchema).nullish(),
   tokens: z.lazy(() => tokensPartialWithRelationsSchema).array(),
+  otp: z.lazy(() => otpsPartialWithRelationsSchema).nullish(),
 }).partial())
 
 export type usersWithPartialRelations = z.infer<typeof usersSchema> & usersPartialRelations
@@ -108,6 +117,7 @@ export type usersWithPartialRelations = z.infer<typeof usersSchema> & usersParti
 export const usersWithPartialRelationsSchema: z.ZodType<usersWithPartialRelations> = usersSchema.merge(z.object({
   accounts: z.lazy(() => accountsPartialWithRelationsSchema).nullish(),
   tokens: z.lazy(() => tokensPartialWithRelationsSchema).array(),
+  otp: z.lazy(() => otpsPartialWithRelationsSchema).nullish(),
 }).partial())
 
 export default usersSchema;

@@ -21,14 +21,15 @@ app.use(cors({ origin: appEnv.CORS_ORIGIN, credentials: true }));
 app.use(helmet());
 app.use(morgan("combined"));
 
-
 app.use("/health-check", Modules.healthCheckRouter);
-app.use('/auth', Modules.authRouter)
+app.use("/auth", Modules.authRouter);
+app.use("/user", Modules.userRouter);
 
 app.use(openAPIRouter);
 
-
 app.listen(appEnv.PORT, () => {
   const { NODE_ENV, HOST, PORT } = appEnv;
-  console.log(`Server (${NODE_ENV}) running on port http://${HOST}:${PORT}/api`);
+  console.log(
+    `Server (${NODE_ENV}) running on port http://${HOST}:${PORT}/api`,
+  );
 });

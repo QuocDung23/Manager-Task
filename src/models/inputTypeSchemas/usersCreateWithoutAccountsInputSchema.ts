@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { UserStatusSchema } from './UserStatusSchema';
 import { tokensCreateNestedManyWithoutUserInputSchema } from './tokensCreateNestedManyWithoutUserInputSchema';
+import { otpsCreateNestedOneWithoutUserInputSchema } from './otpsCreateNestedOneWithoutUserInputSchema';
 
 export const usersCreateWithoutAccountsInputSchema: z.ZodType<Prisma.usersCreateWithoutAccountsInput> = z.strictObject({
   id: z.string().optional(),
@@ -18,6 +19,7 @@ export const usersCreateWithoutAccountsInputSchema: z.ZodType<Prisma.usersCreate
   updatedAt: z.coerce.date().optional(),
   deletedAt: z.coerce.date().optional().nullable(),
   tokens: z.lazy(() => tokensCreateNestedManyWithoutUserInputSchema).optional(),
+  otp: z.lazy(() => otpsCreateNestedOneWithoutUserInputSchema).optional(),
 });
 
 export default usersCreateWithoutAccountsInputSchema;

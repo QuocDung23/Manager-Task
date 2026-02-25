@@ -10,6 +10,7 @@ import { DateTimeFieldUpdateOperationsInputSchema } from './DateTimeFieldUpdateO
 import { NullableDateTimeFieldUpdateOperationsInputSchema } from './NullableDateTimeFieldUpdateOperationsInputSchema';
 import { accountsUpdateOneWithoutUserNestedInputSchema } from './accountsUpdateOneWithoutUserNestedInputSchema';
 import { tokensUpdateManyWithoutUserNestedInputSchema } from './tokensUpdateManyWithoutUserNestedInputSchema';
+import { otpsUpdateOneWithoutUserNestedInputSchema } from './otpsUpdateOneWithoutUserNestedInputSchema';
 
 export const usersUpdateInputSchema: z.ZodType<Prisma.usersUpdateInput> = z.strictObject({
   id: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
@@ -26,6 +27,7 @@ export const usersUpdateInputSchema: z.ZodType<Prisma.usersUpdateInput> = z.stri
   deletedAt: z.union([ z.coerce.date(),z.lazy(() => NullableDateTimeFieldUpdateOperationsInputSchema) ]).optional().nullable(),
   accounts: z.lazy(() => accountsUpdateOneWithoutUserNestedInputSchema).optional(),
   tokens: z.lazy(() => tokensUpdateManyWithoutUserNestedInputSchema).optional(),
+  otp: z.lazy(() => otpsUpdateOneWithoutUserNestedInputSchema).optional(),
 });
 
 export default usersUpdateInputSchema;
