@@ -38,6 +38,11 @@ enum UserStatus {
   LOCKED @map("locked")
 }
 
+enum ProjectStatus {
+  ACTIVE @map("active")
+  INACTIVE  @map("inactive")
+}
+
 model users {
   id      String  @id @default(uuid())
   name    String
@@ -57,7 +62,9 @@ model users {
   accounts accounts?
   // socialAccounts socialAccounts?
   tokens   tokens[]
-  otp     otps?
+  otp      otps?
+  project  projects[]
+  // socialAccounts socialAccounts[]
 
   @@map("users")
 }
@@ -89,4 +96,19 @@ model otps {
   expiresAt DateTime @map("expires_at")
 
   @@map("otps")
+}
+
+model projects {
+  id          String @id @default(uuid())
+  name        String
+  description String
+  userId      String @map("user_id")
+  user        users  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  deletedAt DateTime      @map("deleted_at")
+  status    ProjectStatus @default(ACTIVE)
+
+  @@map("projects")
 }
