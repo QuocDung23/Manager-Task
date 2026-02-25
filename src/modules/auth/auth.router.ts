@@ -21,6 +21,7 @@ import {
   verifyRequestSchema,
   verifyRequestValidationSchema,
 } from "./dtos/requests/verifyOtp.req";
+import authMiddleware from "@/common/middlewares/auth.middleware";
 
 export const authRegistry = new OpenAPIRegistry();
 
@@ -82,6 +83,18 @@ router.post(
   "/verify",
   validateRequestMiddleware(verifyRequestValidationSchema),
   authController.verify,
+);
+
+authRegistry.registerPath({
+	method: 'post',
+	path: '/auth/refresh-token',
+	tags: ['Auth'],
+	responses: createApiResponse(loginResponseDtoSchema, 'Success', StatusCodes.CREATED),
+});
+router.post(
+	'/refresh-token',
+	authMiddleware.verifyRefreshToken,
+	authController.refreshToken,
 );
 
 export const authRouter = router;

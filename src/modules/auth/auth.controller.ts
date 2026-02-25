@@ -9,6 +9,7 @@ import {
   SendOtpRequestDto,
 } from "./dtos/requests";
 import { VerifyRequestDto } from "./dtos/requests/verifyOtp.req";
+import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
 
 export class AuthController {
   constructor(private readonly authService = new AuthService()) {}
@@ -38,6 +39,25 @@ export class AuthController {
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
+
+    if(result.data) {
+      res.cookie('accessToken',
+        result.data.accessToken,
+        {
+          httpOnly: true,
+          maxAge: 30 * 60 * 1000,
+        }
+      )
+      res.cookie(
+        'refreshToken',
+        result.data.refreshToken,
+        {
+          httpOnly: true,
+          maxAge: 7 * 24 * 60 * 60 * 1000
+        }
+      )
+    }
+
     return new HttpResponseDto().success(res, result);
   }
 
@@ -58,4 +78,26 @@ export class AuthController {
     }
     return new HttpResponseDto().success(res, result);
   }
+
+  async refreshToken(req: Request, res: Response): Promise<Response> {
+    const myInformation = (req as any).user as MyInfomationResDto;
+    const result = await this.authService.refreshToken(myInformation);
+    if (result instanceof Exception) {
+        return new HttpResponseDto().exception(res, result);
+    }
+
+    if (result.data) {
+      res.cookie('accessToken', result.data.accessToken, {
+        httpOnly: true,
+        maxAge: 30 * 60 * 1000, 
+      });
+      res.cookie('refreshToken', result.data.refreshToken, {
+        httpOnly: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000, 
+      });
+    }
+
+    return new HttpResponseDto().created(res, result);
+}
+
 }

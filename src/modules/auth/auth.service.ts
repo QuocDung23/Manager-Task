@@ -21,6 +21,8 @@ import { MailService } from "../mail/mail.service";
 import { otpsConfig } from "@/configs";
 import { UserRepository } from "../user/user.repository";
 import { VerifyRequestDto } from "./dtos/requests/verifyOtp.req";
+import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
+import { ref } from "node:process";
 
 export class AuthService {
   constructor(
@@ -182,4 +184,34 @@ export class AuthService {
       data: accountRes,
     };
   }
+
+  async refreshToken(myInfomation: MyInfomationResDto): Promise<HttpResponseBodySuccessDto<LoginResponseDto | Exception>> {
+    const {accessToken, refreshToken} = await signJWT({
+      userId: myInfomation.id
+    })
+
+    await this.authRepository.createToken({
+      token: {
+        refreshToken: refreshToken,
+        user: {
+          connect: {
+            id: myInfomation.id
+          }
+        }
+      }
+    })
+
+    return {
+      success: true,
+      data: {
+        accessToken: accessToken,
+        refreshToken: refreshToken
+      },
+      cookies: {
+        accessToken: accessToken
+      }
+    }
+  }
+
+
 }

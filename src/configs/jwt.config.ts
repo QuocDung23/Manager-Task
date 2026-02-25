@@ -13,7 +13,7 @@ const checkJwt = (value: string | undefined, defaultValue: string, errorMessage:
 export const jwtConfig = {
 	expiresInAccessToken: checkJwt(
 		process.env.EXPIRES_IN_ACCESS_TOKEN,
-		'7d',
+		'10s',
 		'EXPIRES_IN_ACCESS_TOKEN must be set in production',
 	) as SignOptions['expiresIn'],
 	secretAccessToken: checkJwt(
