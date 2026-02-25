@@ -7,6 +7,7 @@ import { usersWhereUniqueInputSchema } from '../inputTypeSchemas/usersWhereUniqu
 import { UsersScalarFieldEnumSchema } from '../inputTypeSchemas/UsersScalarFieldEnumSchema'
 import { accountsArgsSchema } from "../outputTypeSchemas/accountsArgsSchema"
 import { tokensFindManyArgsSchema } from "../outputTypeSchemas/tokensFindManyArgsSchema"
+import { otpsArgsSchema } from "../outputTypeSchemas/otpsArgsSchema"
 import { UsersCountOutputTypeArgsSchema } from "../outputTypeSchemas/UsersCountOutputTypeArgsSchema"
 // Select schema needs to be in file to prevent circular imports
 //------------------------------------------------------
@@ -26,6 +27,7 @@ export const usersSelectSchema: z.ZodType<Prisma.usersSelect> = z.object({
   deletedAt: z.boolean().optional(),
   accounts: z.union([z.boolean(),z.lazy(() => accountsArgsSchema)]).optional(),
   tokens: z.union([z.boolean(),z.lazy(() => tokensFindManyArgsSchema)]).optional(),
+  otp: z.union([z.boolean(),z.lazy(() => otpsArgsSchema)]).optional(),
   _count: z.union([z.boolean(),z.lazy(() => UsersCountOutputTypeArgsSchema)]).optional(),
 }).strict()
 

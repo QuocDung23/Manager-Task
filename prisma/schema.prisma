@@ -5,7 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider   = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -57,7 +57,7 @@ model users {
   accounts accounts?
   // socialAccounts socialAccounts?
   tokens   tokens[]
-  // opts opts?
+  otp     otps?
 
   @@map("users")
 }
@@ -79,4 +79,14 @@ model tokens {
   refreshToken String @unique @map("refresh_token")
 
   @@map("tokens")
+}
+
+model otps {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  user      users    @relation(fields: [userId], references: [id])
+  otp       String   @db.Char(6)
+  expiresAt DateTime @map("expires_at")
+
+  @@map("otps")
 }

@@ -1,7 +1,7 @@
 import { ZodValidationSchema } from '@/common';
-import z, { email } from "zod"
+import z from "zod"
 
-export class RegisterDtos {
+export class RegisterRequestDto {
     email: string
     password: string
     confirmPassword: string
@@ -10,7 +10,7 @@ export class RegisterDtos {
 
 export const registerRequestValidationSchema: ZodValidationSchema = {
     body: z.object({
-        email: z.email(),
+        email: z.string().email(),
         password: z.string().min(6),
         confirmPassword: z.string().min(6),
         name: z.string()

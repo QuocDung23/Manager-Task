@@ -12,6 +12,8 @@ import { DateTimeNullableFilterSchema } from './DateTimeNullableFilterSchema';
 import { AccountsNullableRelationFilterSchema } from './AccountsNullableRelationFilterSchema';
 import { accountsWhereInputSchema } from './accountsWhereInputSchema';
 import { TokensListRelationFilterSchema } from './TokensListRelationFilterSchema';
+import { OtpsNullableRelationFilterSchema } from './OtpsNullableRelationFilterSchema';
+import { otpsWhereInputSchema } from './otpsWhereInputSchema';
 
 export const usersWhereUniqueInputSchema: z.ZodType<Prisma.usersWhereUniqueInput> = z.union([
   z.object({
@@ -43,6 +45,7 @@ export const usersWhereUniqueInputSchema: z.ZodType<Prisma.usersWhereUniqueInput
   deletedAt: z.union([ z.lazy(() => DateTimeNullableFilterSchema), z.coerce.date() ]).optional().nullable(),
   accounts: z.union([ z.lazy(() => AccountsNullableRelationFilterSchema), z.lazy(() => accountsWhereInputSchema) ]).optional().nullable(),
   tokens: z.lazy(() => TokensListRelationFilterSchema).optional(),
+  otp: z.union([ z.lazy(() => OtpsNullableRelationFilterSchema), z.lazy(() => otpsWhereInputSchema) ]).optional().nullable(),
 }));
 
 export default usersWhereUniqueInputSchema;

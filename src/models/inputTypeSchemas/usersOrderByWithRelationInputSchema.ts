@@ -5,6 +5,7 @@ import { SortOrderSchema } from './SortOrderSchema';
 import { SortOrderInputSchema } from './SortOrderInputSchema';
 import { accountsOrderByWithRelationInputSchema } from './accountsOrderByWithRelationInputSchema';
 import { tokensOrderByRelationAggregateInputSchema } from './tokensOrderByRelationAggregateInputSchema';
+import { otpsOrderByWithRelationInputSchema } from './otpsOrderByWithRelationInputSchema';
 
 export const usersOrderByWithRelationInputSchema: z.ZodType<Prisma.usersOrderByWithRelationInput> = z.strictObject({
   id: z.lazy(() => SortOrderSchema).optional(),
@@ -21,6 +22,7 @@ export const usersOrderByWithRelationInputSchema: z.ZodType<Prisma.usersOrderByW
   deletedAt: z.union([ z.lazy(() => SortOrderSchema), z.lazy(() => SortOrderInputSchema) ]).optional(),
   accounts: z.lazy(() => accountsOrderByWithRelationInputSchema).optional(),
   tokens: z.lazy(() => tokensOrderByRelationAggregateInputSchema).optional(),
+  otp: z.lazy(() => otpsOrderByWithRelationInputSchema).optional(),
 });
 
 export default usersOrderByWithRelationInputSchema;
