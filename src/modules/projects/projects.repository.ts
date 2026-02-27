@@ -34,17 +34,20 @@ export class ProjectsRepository {
     return Promise.all([
       this.prismaService.projects.findMany({
         where: {
-          userId: userId,
-          name: name,
-          status: status,
+          userId,
+          name,
+          status,
+          deletedAt: { equals: null },
         },
-        skip: skip,
-        take: take,
+        skip,
+        take,
       }),
       this.prismaService.projects.count({
         where: {
-          name: name,
-          status: status,
+          userId,
+          name,
+          status,
+          deletedAt: { equals: null },
         },
       }),
     ]);
@@ -99,7 +102,7 @@ export class ProjectsRepository {
       where: { id: id, userId: userId },
       data: {
         deletedAt: new Date(),
-        status: ProjectStatus.INACTIVE
+        status: ProjectStatus.INACTIVE,
       },
     });
   }
