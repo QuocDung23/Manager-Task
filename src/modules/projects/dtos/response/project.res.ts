@@ -14,8 +14,8 @@ export class ProjectResponseDto {
   }
 }
 
-export const ProjectResponseSchema = z.object({
-  id: z.string(),
+export const projectResponseSchema = z.object({
+  id: z.string().uuid(),
   name: z.string(),
   description: z.string(),
   userId: z.string(),

@@ -24,6 +24,7 @@ app.use(morgan("combined"));
 app.use("/health-check", Modules.healthCheckRouter);
 app.use("/auth", Modules.authRouter);
 app.use("/user", Modules.userRouter);
+app.use("/project", Modules.projectRouter);
 
 app.use(openAPIRouter);
 
