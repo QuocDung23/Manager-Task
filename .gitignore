@@ -4,3 +4,5 @@ dist
 /generated/prisma
 /prisma/migrations
 /src/models
+/README.MD
+

@@ -7,6 +7,9 @@
     "dev": "tsx watch --clear-screen=false src/app.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "prisma": {
+    "seed": "tsx src/modules/data/seed.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -38,14 +41,15 @@
     "pg": "^8.18.0",
     "reflect-metadata": "^0.2.2",
     "swagger-ui-express": "^5.0.1",
-    "tsx": "^4.20.5",
     "zod": "^4.3.6",
     "zod-prisma-types": "^3.3.11"
   },
   "devDependencies": {
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.3.3",
     "@types/pg": "^8.16.0",
     "prisma": "^5.22.0",
-    "typescript": "^5.9.2"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
