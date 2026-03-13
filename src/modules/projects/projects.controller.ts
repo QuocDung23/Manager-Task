@@ -3,7 +3,7 @@ import { ProjectsService } from "./projects.service";
 import { GetProjectRequestDto } from "./dtos/request/getProject.req";
 import { Exception } from "@tsed/exceptions";
 import { HttpResponseDto, PaginationDto } from "@/common";
-import { CreateProjectRequestDto, ProjectResponseDto } from "./dtos";
+import { AddProjectMemberRequestDto, CreateProjectRequestDto } from "./dtos";
 import { GetAllProjectRequestDto } from "./dtos/request/getAllProject.req";
 import { UpdateProjectRequestDto } from "./dtos/request/updateProject.req";
 
@@ -88,4 +88,21 @@ export class ProjectController {
     }
     return new HttpResponseDto().success(res, result);
   }
+
+  async addMember(req: Request, res: Response): Promise<Response> {
+    const { projectId } = req.params;
+
+    const addMemberDto = new AddProjectMemberRequestDto(req.body as any);
+    const result = await this.projectService.addMember(
+      projectId as string,
+      addMemberDto,
+    );
+
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+
+    return new HttpResponseDto().success(res, result);
+  }
 }
+

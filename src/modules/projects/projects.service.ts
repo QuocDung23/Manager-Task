@@ -1,20 +1,34 @@
 import {
   ConflictException,
   HttpResponseBodySuccessDto,
+  InternalServerException,
   NotFoundException,
   PaginationDto,
   PaginationUtils,
 } from "@/common";
-import { CreateProjectRequestDto, ProjectResponseDto } from "./dtos";
+import {
+  AddProjectMemberRequestDto,
+  CreateProjectRequestDto,
+  ProjectMemberResponseDto,
+  ProjectResponseDto,
+} from "./dtos";
 import { ProjectsRepository } from "./projects.repository";
 import { Exception } from "@tsed/exceptions";
 import { GetProjectRequestDto } from "./dtos/request/getProject.req";
-import { Prisma } from "@prisma/client";
+import { Prisma, UserStatus } from "@prisma/client";
 import { GetAllProjectRequestDto } from "./dtos/request/getAllProject.req";
 import { UpdateProjectRequestDto } from "./dtos/request/updateProject.req";
+import { RoleRepository } from "../roles/roles.repository";
+import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
+import { UserRepository } from "../user/user.repository";
 
 export class ProjectsService {
-  constructor(private readonly projectsRepository = new ProjectsRepository()) {}
+  constructor(
+    private readonly projectsRepository = new ProjectsRepository(),
+    private readonly rolesRepository = new RoleRepository(),
+    private readonly projectMemberRepository = new ProjectMemberRepo(),
+    private readonly userRepository = new UserRepository(),
+  ) {}
 
   async getProjectById(
     getProjectDto: GetProjectRequestDto,
@@ -90,6 +104,20 @@ export class ProjectsService {
     const newProject = await this.projectsRepository.createProject({
       project: createProject,
     });
+
+    const adminRole = await this.rolesRepository.findRolesName("PROJECT_MANAGER");
+    if (!adminRole) {
+      throw new InternalServerException();
+    }
+    const userId = createProjectDto.userId;
+    const projectId = newProject.id;
+    if (!userId || !projectId) throw new InternalServerException();
+    await this.projectMemberRepository.addMemberToProject(
+      userId,
+      projectId,
+      adminRole.id,
+    );
+
     return {
       success: true,
       data: new ProjectResponseDto(newProject as any),
@@ -145,4 +173,47 @@ export class ProjectsService {
       data: new ProjectResponseDto(deletedProject),
     };
   }
+
+  async addMember(
+    projectId: string,
+    addMemberDto: AddProjectMemberRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
+    const project = await this.projectsRepository.getProject({ id: projectId });
+    if (!project) {
+      throw new NotFoundException("Project not found");
+    }
+
+    const user = await this.userRepository.findUser({
+      userId: addMemberDto.userId,
+      status: UserStatus.ACTIVE,
+    });
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    const memberRole = await this.rolesRepository.findRolesName("PROJECT_MEMBER");
+    if (!memberRole) {
+      throw new InternalServerException();
+    }
+
+    const existingMember = await this.projectMemberRepository.findProjectMember(
+      addMemberDto.userId,
+      projectId,
+    );
+    if (existingMember) {
+      throw new ConflictException("User already in project");
+    }
+
+    const member = await this.projectMemberRepository.addMemberToProject(
+      addMemberDto.userId,
+      projectId,
+      memberRole.id,
+    );
+
+    return {
+      success: true,
+      data: new ProjectMemberResponseDto(member as any),
+    };
+  }
 }
+

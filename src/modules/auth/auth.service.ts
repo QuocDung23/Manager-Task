@@ -59,7 +59,7 @@ export class AuthService {
       accounts: account,
     });
 
-     await this.sendOtp({ email: registerDto.email });
+    await this.authRepository.addUserRole(newAccount.userId, "USER");
 
     return {
       success: true,

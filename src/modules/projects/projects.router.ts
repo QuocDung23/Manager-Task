@@ -8,12 +8,16 @@ import {
 } from "./dtos/request/getProject.req";
 import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
+  addProjectMemberRequestSchema,
+  addProjectMemberRequestValidationSchema,
   createProjectRequestSchema,
   createProjectRequestValidationSchema,
+  projectMemberResponseSchema,
   projectResponseSchema,
 } from "./dtos";
 import { StatusCodes } from "http-status-codes";
 import authMiddleware from "@/common/middlewares/auth.middleware";
+import { ProjectPermissions } from "@/common/enums/permissions";
 import {
   getAllProjectRequestSchema,
   getAllProjectRequestValidationSchema,
@@ -43,6 +47,7 @@ projectRegistry.registerPath({
 router.get(
   "/getAlls",
   authMiddleware.verifyAccessToken,
+  authMiddleware.verifySystemPermission(ProjectPermissions.VIEW_PROJECT),
   validateRequestMiddleware(getAllProjectRequestValidationSchema),
   projectController.getAllProject,
 );
@@ -79,6 +84,7 @@ projectRegistry.registerPath({
 router.post(
   "/create",
   authMiddleware.verifyAccessToken,
+  authMiddleware.verifySystemPermission(ProjectPermissions.CREATE_PROJECT),
   validateRequestMiddleware(createProjectRequestValidationSchema),
   projectController.createProject,
 );
@@ -95,8 +101,17 @@ projectRegistry.registerPath({
   ),
 });
 router.put(
+  "/:projectId/update",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(ProjectPermissions.UPDATE_PROJECT),
+  validateRequestMiddleware(updateProjectRequestValidationSchema),
+  projectController.updateProject,
+);
+
+router.put(
   "/:projectId",
   authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(ProjectPermissions.UPDATE_PROJECT),
   validateRequestMiddleware(updateProjectRequestValidationSchema),
   projectController.updateProject,
 );
@@ -115,8 +130,28 @@ projectRegistry.registerPath({
 router.delete(
   "/:projectId",
   authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(ProjectPermissions.DELETE_PROJECT),
   validateRequestMiddleware(getProjectRequestVadilationSchema),
   projectController.deleteProject,
+);
+
+projectRegistry.registerPath({
+  method: "post",
+  path: "/project/{projectId}/members",
+  tags: ["Projects"],
+  request: addProjectMemberRequestSchema,
+  responses: createApiResponse(
+    projectMemberResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.post(
+  "/:projectId/members",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(ProjectPermissions.ADD_MEMBER_PROJECT),
+  validateRequestMiddleware(addProjectMemberRequestValidationSchema),
+  projectController.addMember,
 );
 
 export const projectRouter = router;

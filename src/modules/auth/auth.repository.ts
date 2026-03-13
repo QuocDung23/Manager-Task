@@ -39,6 +39,20 @@ export class AuthRepository {
         })
     }
 
+	async addUserRole(userId: string, roleName: string): Promise<void> {
+		const role = await this.prismaService.roles.findUnique({
+			where: { name: roleName },
+		});
+		if (!role) return;
+		await this.prismaService.userRoles.upsert({
+			where: {
+				userId_roleId: { userId, roleId: role.id },
+			},
+			update: {},
+			create: { userId, roleId: role.id },
+		});
+	}
+
 	async createToken({ token }: { token: Prisma.tokensCreateInput }): Promise<tokens> {
         const userId = token.user?.connect?.id;
 
