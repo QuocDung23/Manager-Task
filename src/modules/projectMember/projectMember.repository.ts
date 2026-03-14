@@ -17,6 +17,20 @@ export class ProjectMemberRepo {
     });
   }
 
+  async assignUserRoleProject(
+    userId: string,
+    projectId: string,
+    roleId: string,
+  ) {
+    return this.prisma.projectMembers.create({
+      data: {
+        projectId,
+        userId,
+        roleId,
+      },
+    });
+  }
+
   async addMemberToProject(
     userId: string,
     projectId: string,
@@ -29,5 +43,19 @@ export class ProjectMemberRepo {
         roleId,
       },
     });
+  }
+
+  async checkMemberOfProject(
+    projectId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const isMember = await this.prisma.projectMembers.findFirst({
+      where: {
+        projectId,
+        userId,
+      },
+      select: { id: true },
+    });
+    return !!isMember;
   }
 }

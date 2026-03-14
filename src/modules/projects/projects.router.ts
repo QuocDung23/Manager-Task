@@ -1,5 +1,6 @@
 import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { ProjectController } from "./projects.controller";
+import { BoardController } from "../board/board.controller";
 import express from "express";
 import { autoBindUtil, validateRequestMiddleware } from "@/common";
 import {
@@ -17,11 +18,16 @@ import {
 } from "./dtos";
 import { StatusCodes } from "http-status-codes";
 import authMiddleware from "@/common/middlewares/auth.middleware";
-import { ProjectPermissions } from "@/common/enums/permissions";
+import { ProjectPermissions, UserPermissions } from "@/common/enums/permissions";
 import {
   getAllProjectRequestSchema,
   getAllProjectRequestValidationSchema,
 } from "./dtos/request/getAllProject.req";
+import {
+  createBoardRequestSchema,
+  createBoardRequestValidationSchema,
+} from "../board/dtos/requests/createBoard.req";
+import { boardResponseSchema } from "../board/dtos/responses/board.res";
 import {
   updateProjectRequestSchema,
   updateProjectRequestValidationSchema,
@@ -30,8 +36,10 @@ import {
 export const projectRegistry = new OpenAPIRegistry();
 
 const projectController = new ProjectController();
+const boardController = new BoardController();
 const router = express.Router({ mergeParams: true });
 autoBindUtil(projectController);
+autoBindUtil(boardController);
 
 projectRegistry.registerPath({
   method: "get",
@@ -72,21 +80,21 @@ router.get(
 
 projectRegistry.registerPath({
   method: "post",
-  path: "/project/create",
+  path: "/project/{projectId}/boards",
   tags: ["Projects"],
-  request: createProjectRequestSchema,
+  request: createBoardRequestSchema,
   responses: createApiResponse(
-    projectResponseSchema,
+    boardResponseSchema,
     "Success",
     StatusCodes.OK,
   ),
 });
 router.post(
-  "/create",
+  "/:projectId/boards",
   authMiddleware.verifyAccessToken,
-  authMiddleware.verifySystemPermission(ProjectPermissions.CREATE_PROJECT),
-  validateRequestMiddleware(createProjectRequestValidationSchema),
-  projectController.createProject,
+  authMiddleware.verifyProjectPermission(ProjectPermissions.CREATE_BOARD),
+  validateRequestMiddleware(createBoardRequestValidationSchema),
+  boardController.createBoard,
 );
 
 projectRegistry.registerPath({

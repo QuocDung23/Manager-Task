@@ -18,7 +18,7 @@ export class PermissionRepository {
     return !!checkSuperAdmin;
   }
 
-  private async checkSystemLeve(
+  private async checkSystemLevel(
     userId: string,
     permission: string[],
   ): Promise<boolean> {
@@ -37,12 +37,18 @@ export class PermissionRepository {
     return !!checkSystem;
   }
 
-  private async checkProjectLeve(
+  private async checkScopedLevel(
     userId: string,
-    projectId: string,
     permission: string[],
+    scope: "project" | "board",
+    scopeId: string,
   ): Promise<boolean> {
-    const checkProject = await this.prismaService.rolePermissions.findFirst({
+    const memberRelation =
+      scope === "project"
+        ? { projectMembers: { some: { userId, projectId: scopeId } } }
+        : { boardMembers: { some: { userId, boardId: scopeId } } };
+
+    const check = await this.prismaService.rolePermissions.findFirst({
       where: {
         permission: {
           name: { in: permission },
@@ -50,25 +56,49 @@ export class PermissionRepository {
         },
         role: {
           status: RoleStatus.ACTIVE,
-          projectMembers: { some: { userId, projectId } },
+          ...memberRelation,
         },
       },
     });
-    return !!checkProject;
+
+    return !!check;
+  }
+
+  private async checkProjectLevel(
+    userId: string,
+    projectId: string,
+    permission: string[],
+  ): Promise<boolean> {
+    return this.checkScopedLevel(userId, permission, "project", projectId);
+  }
+
+  private async checkBoardLevel(
+    userId: string,
+    boardId: string,
+    permission: string[],
+  ): Promise<boolean> {
+    return this.checkScopedLevel(userId, permission, "board", boardId);
   }
 
   async checkAnyPermission(
     userId: string,
     permission: string[],
-    context?: { projectId: string },
+    context?: { projectId?: string; boardId?: string },
   ): Promise<boolean> {
     if (await this.isSuperAdmin(userId)) return true;
 
-    if (await this.checkSystemLeve(userId, permission)) return true;
+    if (await this.checkSystemLevel(userId, permission)) return true;
 
     if (context?.projectId) {
-      if (await this.checkProjectLeve(userId, context?.projectId, permission))
+      if (await this.checkProjectLevel(userId, context.projectId, permission)) {
         return true;
+      }
+    }
+
+    if (context?.boardId) {
+      if (await this.checkBoardLevel(userId, context.boardId, permission)) {
+        return true;
+      }
     }
 
     return false;

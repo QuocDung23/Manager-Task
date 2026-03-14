@@ -1,0 +1,113 @@
+import { boardMembersPartialWithRelations, boards } from "@/models";
+import { PrismaService } from "../data";
+import { BoardStatus, Prisma } from "@prisma/client";
+
+export class BoardRepository {
+  constructor(private readonly prisma = new PrismaService()) {}
+
+  async getBoardById({
+    id,
+    name,
+    status,
+    projectId,
+    userId,
+  }: {
+    id?: string;
+    name?: string;
+    status?: BoardStatus;
+    projectId?: string;
+    userId?: string;
+  }): Promise<boards | null> {
+    return this.prisma.boards.findFirst({
+      where: {
+        id: id,
+        name: name,
+        status: status,
+        projectId: projectId,
+        userId: userId,
+
+        deletedAt: { equals: null },
+      },
+    });
+  }
+
+  async getBoards({
+    projectId,
+    name,
+    status,
+    userId,
+    skip,
+    take,
+  }: {
+    projectId?: string;
+    name?: string;
+    status?: BoardStatus;
+    userId?: string;
+    skip: number;
+    take: number;
+  }): Promise<[boards[], number]> {
+    return Promise.all([
+      this.prisma.boards.findMany({
+        where: {
+          projectId: projectId,
+          userId: userId,
+          name: name,
+          status: status,
+
+          deletedAt: { equals: null },
+        },
+        skip,
+        take,
+      }),
+      this.prisma.boards.count({
+        where: {
+          projectId: projectId,
+          userId: userId,
+          name: name,
+          status: status,
+
+          deletedAt: { equals: null },
+        },
+      }),
+    ]);
+  }
+
+  async createBoard({
+    board,
+  }: {
+    board: Prisma.boardsCreateInput;
+  }): Promise<boardMembersPartialWithRelations> {
+    return this.prisma.boards.create({
+      include: {
+        user: true,
+      },
+      data: board,
+    });
+  }
+
+  async updateBoard({
+    id,
+    board,
+  }: {
+    id: string;
+    board: Prisma.boardsUpdateInput;
+  }): Promise<boards> {
+    const { ...data } = board;
+    return this.prisma.boards.update({
+      where: {
+        id: id,
+      },
+      data: data,
+    });
+  }
+
+  async deleteBoard({id, userId}: {id: string, userId: string}): Promise<boards> {
+    return this.prisma.boards.update({
+      where: { id: id, userId: userId },
+      data: {
+        deletedAt: new Date(),
+        status: BoardStatus.INACTIVE,
+      },
+    });
+  }
+}

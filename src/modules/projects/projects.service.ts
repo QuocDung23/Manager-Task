@@ -21,6 +21,7 @@ import { UpdateProjectRequestDto } from "./dtos/request/updateProject.req";
 import { RoleRepository } from "../roles/roles.repository";
 import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
 import { UserRepository } from "../user/user.repository";
+import { ProjectRole } from "@/common/enums/roles";
 
 export class ProjectsService {
   constructor(
@@ -105,18 +106,31 @@ export class ProjectsService {
       project: createProject,
     });
 
-    const adminRole = await this.rolesRepository.findRolesName("PROJECT_MANAGER");
-    if (!adminRole) {
-      throw new InternalServerException();
-    }
     const userId = createProjectDto.userId;
     const projectId = newProject.id;
-    if (!userId || !projectId) throw new InternalServerException();
-    await this.projectMemberRepository.addMemberToProject(
+
+    if (!userId || !projectId) {
+      throw new InternalServerException();
+    }
+
+    const existingMember = await this.projectMemberRepository.findProjectMember(
       userId,
       projectId,
-      adminRole.id,
     );
+    if (!existingMember) {
+      const adminRole = await this.rolesRepository.findRolesName(
+        ProjectRole.PROJECT_ADMIN,
+      );
+      if (!adminRole) {
+        throw new InternalServerException();
+      }
+
+      await this.projectMemberRepository.assignUserRoleProject(
+        userId,
+        projectId,
+        adminRole.id,
+      );
+    }
 
     return {
       success: true,
@@ -191,7 +205,8 @@ export class ProjectsService {
       throw new NotFoundException("User not found");
     }
 
-    const memberRole = await this.rolesRepository.findRolesName("PROJECT_MEMBER");
+    const memberRole =
+      await this.rolesRepository.findRolesName("PROJECT_MEMBER");
     if (!memberRole) {
       throw new InternalServerException();
     }
@@ -216,4 +231,3 @@ export class ProjectsService {
     };
   }
 }
-

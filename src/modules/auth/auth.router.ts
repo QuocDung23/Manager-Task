@@ -22,12 +22,18 @@ import {
   verifyRequestValidationSchema,
 } from "./dtos/requests/verifyOtp.req";
 import authMiddleware from "@/common/middlewares/auth.middleware";
+import { ProjectController } from "../projects/projects.controller";
+import { projectResponseSchema } from "../projects/dtos/response/project.res";
+import { createProjectRequestSchema, createProjectRequestValidationSchema } from "../projects/dtos/request/createProject.req";
+import { UserPermissions } from "@/common/enums/permissions";
 
 export const authRegistry = new OpenAPIRegistry();
 
 const authController = new AuthController();
+const projectController = new ProjectController()
 const router = express.Router({ mergeParams: true });
 autoBindUtil(authController);
+autoBindUtil(projectController)
 
 authRegistry.registerPath({
   method: "post",
@@ -96,5 +102,20 @@ router.post(
 	authMiddleware.verifyRefreshToken,
 	authController.refreshToken,
 );
+
+authRegistry.registerPath({
+  method: 'post',
+  path: '/auth/create-project',
+  tags: ['Auth'],
+  request: createProjectRequestSchema,
+  responses: createApiResponse(projectResponseSchema, 'Success', StatusCodes.CREATED),   
+})
+router.post(
+  '/create-project',
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifySystemPermission(UserPermissions.CREATE_PROJECT),
+  validateRequestMiddleware(createProjectRequestValidationSchema),
+  projectController.createProject,
+)
 
 export const authRouter = router;

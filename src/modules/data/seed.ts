@@ -1,8 +1,9 @@
 import {
+  BoardPermissions,
   ProjectPermissions,
   UserPermissions,
 } from "@/common/enums/permissions";
-import { ProjectRole, UserRole } from "@/common/enums/roles";
+import { BoardRole, ProjectRole, UserRole } from "@/common/enums/roles";
 import { PrismaClient, UserStatus } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -10,6 +11,7 @@ const prisma = new PrismaClient();
 const allPermissions = [
   ...Object.values(UserPermissions),
   ...Object.values(ProjectPermissions),
+  ...Object.values(BoardPermissions)
 ];
 
 const rolePermissionMap: Record<string, readonly string[]> = {
@@ -29,8 +31,26 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     ProjectPermissions.ADD_MEMBER_PROJECT,
     ProjectPermissions.REMOVE_MEMBER_PROJECT,
     ProjectPermissions.UPDATE_ROLE_MEMBER_PROJECT,
+    ProjectPermissions.CREATE_BOARD
   ],
-  [ProjectRole.PROJECT_MEMBER]: [ProjectPermissions.VIEW_PROJECT],
+  [ProjectRole.PROJECT_MEMBER]: [
+    ProjectPermissions.VIEW_PROJECT,
+    ProjectPermissions.CREATE_BOARD
+  ],
+
+  [BoardRole.BOARD_ADMIN]: [
+    BoardPermissions.UPDATE_BOARD,
+    BoardPermissions.DELETE_BOARD,
+    BoardPermissions.VIEW_BOARD,
+    BoardPermissions.ADD_MEMBER_BOARD,
+    BoardPermissions.REMOVE_MEMBER_BOARD,
+    BoardPermissions.UPDATE_ROLE_MEMBER_BOARD,
+    BoardPermissions.CREATE_LIST
+  ],
+  [BoardRole.BOARD_MEMBER]: [
+    BoardPermissions.VIEW_BOARD,
+    BoardPermissions.CREATE_LIST
+  ]
 };
 
 const ROLE_PERMISSIONS = Array.from(
@@ -57,6 +77,7 @@ async function main() {
   const allRoles = [
     ...Object.values(UserRole),
     ...Object.values(ProjectRole),
+    ...Object.values(BoardRole)
   ];
   for (const role of allRoles) {
     await prisma.roles.upsert({

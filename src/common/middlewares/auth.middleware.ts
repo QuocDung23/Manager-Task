@@ -15,7 +15,6 @@ import { UserStatus } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { Request, Response, NextFunction } from "express";
 import { PermissionRepository } from "@/modules/permission/permission.repository";
-import type { Permission } from "@/common/enums/permissions";
 
 class AuthMiddleware extends BaseAutoBindMiddleware {
   constructor(
@@ -68,6 +67,10 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
       if (error instanceof JsonWebTokenError) {
         throw new UnauthorizedException(error.message);
       }
+      if (error instanceof ClientException) {
+        throw error;
+      }
+      throw error;
     }
     next();
   }
@@ -141,7 +144,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
    * Middleware kiểm tra user có ít nhất một trong các permission (system-level, từ userRoles).
    * Nên truyền enum: verifySystemPermission(ProjectPermissions.VIEW_PROJECT) hoặc SystemPermissions.MANAGE_USERS.
    */
-  verifySystemPermission(...permissions: Permission[]) {
+  verifySystemPermission(...permissions: string[]) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
         const user = (req as any).user;
@@ -166,12 +169,12 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
    * Middleware kiểm tra user có quyền trong project (project-level, từ projectMembers).
    * Nên truyền enum: verifyProjectPermission(ProjectPermissions.UPDATE_PROJECT).
    */
-  verifyProjectPermission(...permissions: Permission[]) {
+  verifyProjectPermission(...permissions: string[]) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
         const user = (req as any).user;
         if (!user) {
-          throw new UnauthorizedException("Unverified"); 
+          throw new UnauthorizedException("Unverified");
         }
 
         const projectId = (req.params.projectId ||
@@ -186,6 +189,38 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
           user.id,
           permissions,
           { projectId },
+        );
+
+        if (!hasPermission) {
+          throw new ForbiddenException();
+        }
+
+        next();
+      } catch (error) {
+        next(error);
+      }
+    };
+  }
+
+  verifyBoardPermission(...permissions: string[]) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const user = (req as any).user;
+        if (!user) {
+          throw new UnauthorizedException("Unverified");
+        }
+
+        const boardId = ((req.params as any)?.boardId ||
+          (req.body as any)?.boardId ||
+          (req.query as any)?.boardId) as string;
+        if (!boardId) {
+          throw new NotFoundException("Board Not Found");
+        }
+
+        const hasPermission = await this.permissionRepo.checkAnyPermission(
+          user.id,
+          permissions,
+          { boardId },
         );
 
         if (!hasPermission) {
