@@ -1,4 +1,4 @@
-import { boardMembers, Prisma } from "@prisma/client";
+import { boardMembers, BoardMemberStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../data/prisma.client";
 
 export class BoardMemberRepository {
@@ -16,5 +16,16 @@ export class BoardMemberRepository {
         roleId,
       }
     });
+  }
+
+  async checkMemberOfBoard(boardId: string, userId: string): Promise<boolean> {
+    const member = await this.prisma.boardMembers.findFirst({
+      where: {
+        boardId,
+        userId,
+        status: BoardMemberStatus.ACTIVE,
+      }
+    });
+    return !!member;
   }
 }

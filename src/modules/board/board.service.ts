@@ -19,6 +19,9 @@ import { BoardRole } from "@/common/enums/roles";
 import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { BoardMemberRepository } from "../boardMember/boardMember.repository";
+import { UpdateBoardRequestDto } from "./dtos/requests/updateBoard.req";
+import { DeleteBoardRequestDto } from "./dtos/requests/deleteBoard.req";
+import { AddMemberBoardRequestDto } from "./dtos/requests/addMemberBoard.req";
 
 export class BoardService {
   constructor(
@@ -139,6 +142,115 @@ export class BoardService {
     return {
       success: true,
       data: new BoardResponseDto(newBoard as any),
+    };
+  }
+
+  async updateBoard(
+    updateBoard: UpdateBoardRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<BoardResponseDto> | Exception> {
+    const existingBoard = await this.boardRepository.getBoardById({
+      id: updateBoard.boardId,
+    });
+    if (!existingBoard) {
+      throw new NotFoundException("Board not found");
     }
+
+    const checkMember = await this.boardMemberRepository.checkMemberOfBoard(
+      updateBoard.boardId,
+      updateBoard.userId,
+    );
+    if (!checkMember) {
+      throw new ForbiddenException();
+    }
+
+    const updateBoarData: Prisma.boardsUpdateInput = {
+      name: updateBoard.name,
+      description: updateBoard.description,
+    };
+
+    const updatedBoard = await this.boardRepository.updateBoard({
+      id: updateBoard.boardId,
+      board: updateBoarData,
+    });
+
+    return {
+      success: true,
+      data: new BoardResponseDto(updatedBoard),
+    };
+  }
+
+  async deleteBoard(
+    deleteBoard: DeleteBoardRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<BoardResponseDto> | Exception> {
+    const existingBoard = await this.boardRepository.getBoardById({
+      id: deleteBoard.boardId,
+    });
+    if (!existingBoard) {
+      throw new NotFoundException("Board not found");
+    }
+
+    const checkMember = await this.boardMemberRepository.checkMemberOfBoard(
+      deleteBoard.boardId,
+      deleteBoard.userId,
+    );
+    if (!checkMember) {
+      throw new ForbiddenException();
+    }
+
+    const deletedBoard = await this.boardRepository.deleteBoard({
+      id: deleteBoard.boardId,
+      userId: deleteBoard.userId,
+    });
+
+    return {
+      success: true,
+      data: new BoardResponseDto(deletedBoard),
+    };
+  }
+
+  async addMemberToBoard(
+    addMemberBoardDto: AddMemberBoardRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<null> | Exception> {
+    const { boardId, userId } = addMemberBoardDto;
+
+    const existingBoard = await this.boardRepository.getBoardById({
+      id: boardId,
+    });
+    if (!existingBoard) {
+      throw new NotFoundException("Board not found");
+    }
+
+    const isProjectMember =
+      await this.projectMemberRepository.checkMemberOfProject(
+        existingBoard.projectId,
+        userId,
+      );
+    if (!isProjectMember) {
+      throw new ForbiddenException();
+    }
+
+    const isBoardMember =
+      await this.boardMemberRepository.checkMemberOfBoard(boardId, userId);
+    if (isBoardMember) {
+      throw new ConflictException("User already a board member");
+    }
+
+    const boardMemberRole = await this.rolesRepository.findRolesName(
+      BoardRole.BOARD_MEMBER,
+    );
+    if (!boardMemberRole) {
+      throw new InternalServerException();
+    }
+
+    await this.boardMemberRepository.addMemberOfBoard(
+      userId,
+      boardId,
+      boardMemberRole.id,
+    );
+
+    return {
+      success: true,
+      data: null,
+    };
   }
 }

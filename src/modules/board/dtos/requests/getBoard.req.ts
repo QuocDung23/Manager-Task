@@ -4,6 +4,7 @@ import z from "zod"
 
 export class GetBoardRequestDto {
     boardId: string
+    userId: string
     name?: string
     status?: BoardStatus
     
@@ -11,7 +12,8 @@ export class GetBoardRequestDto {
     constructor(data: GetBoardRequestDto) {
         this.boardId = data.boardId
         this.name = data?.name
-        this.status = data?.status
+        this.status = data?.status  
+        this.userId = data.userId
     }
 }
 
