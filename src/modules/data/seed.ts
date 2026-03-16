@@ -18,6 +18,7 @@ const rolePermissionMap: Record<string, readonly string[]> = {
   [UserRole.SUPER_ADMIN]: [
     ...Object.values(UserPermissions),
     ...Object.values(ProjectPermissions),
+    ...Object.values(BoardPermissions),
   ],
   [UserRole.USER]: [
     UserPermissions.CREATE_PROJECT,
@@ -31,7 +32,9 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     ProjectPermissions.ADD_MEMBER_PROJECT,
     ProjectPermissions.REMOVE_MEMBER_PROJECT,
     ProjectPermissions.UPDATE_ROLE_MEMBER_PROJECT,
-    ProjectPermissions.CREATE_BOARD
+    ProjectPermissions.CREATE_BOARD,
+
+    ...Object.values(BoardPermissions),
   ],
   [ProjectRole.PROJECT_MEMBER]: [
     ProjectPermissions.VIEW_PROJECT,
