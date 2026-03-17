@@ -48,6 +48,11 @@ enum BoardStatus {
   INACTIVE @map("inactive")
 }
 
+enum ListStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
 enum ProjectMemberStatus {
   ACTIVE   @map("active")
   INACTIVE @map("inactive")
@@ -232,6 +237,7 @@ model boards {
   deletedAt DateTime? @map("deleted_at")
 
   boardMembers boardMembers[]
+  lists lists[]
 
   @@map("boards")
 }
@@ -251,4 +257,20 @@ model boardMembers {
   deletedAt DateTime? @map("deleted_at")
 
   @@map("boardMembers")
+}
+
+model lists{
+  id String @id @default(uuid())
+  name String
+  description String
+  order Int @default(0)
+  boardId String @map("board_id")
+  board boards @relation(fields: [boardId], references: [id])
+  status ListStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("lists")
 }

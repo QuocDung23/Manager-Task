@@ -1,5 +1,6 @@
 import {
   BoardPermissions,
+  ListPermissions,
   ProjectPermissions,
   UserPermissions,
 } from "@/common/enums/permissions";
@@ -11,7 +12,8 @@ const prisma = new PrismaClient();
 const allPermissions = [
   ...Object.values(UserPermissions),
   ...Object.values(ProjectPermissions),
-  ...Object.values(BoardPermissions)
+  ...Object.values(BoardPermissions),
+  ...Object.values(ListPermissions),
 ];
 
 const rolePermissionMap: Record<string, readonly string[]> = {
@@ -19,6 +21,7 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     ...Object.values(UserPermissions),
     ...Object.values(ProjectPermissions),
     ...Object.values(BoardPermissions),
+    ...Object.values(ListPermissions),
   ],
   [UserRole.USER]: [
     UserPermissions.CREATE_PROJECT,
@@ -35,10 +38,13 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     ProjectPermissions.CREATE_BOARD,
 
     ...Object.values(BoardPermissions),
+    ...Object.values(ListPermissions),
   ],
   [ProjectRole.PROJECT_MEMBER]: [
     ProjectPermissions.VIEW_PROJECT,
-    ProjectPermissions.CREATE_BOARD
+    ProjectPermissions.CREATE_BOARD,
+
+    ...Object.values(ListPermissions),
   ],
 
   [BoardRole.BOARD_ADMIN]: [
@@ -48,11 +54,15 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     BoardPermissions.ADD_MEMBER_BOARD,
     BoardPermissions.REMOVE_MEMBER_BOARD,
     BoardPermissions.UPDATE_ROLE_MEMBER_BOARD,
-    BoardPermissions.CREATE_LIST
+    BoardPermissions.CREATE_LIST,
+
+    ...Object.values(ListPermissions),
   ],
   [BoardRole.BOARD_MEMBER]: [
     BoardPermissions.VIEW_BOARD,
-    BoardPermissions.CREATE_LIST
+    BoardPermissions.CREATE_LIST,
+
+    ...Object.values(ListPermissions),
   ]
 };
 

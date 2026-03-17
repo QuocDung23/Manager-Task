@@ -4,6 +4,7 @@ import {
   healthCheckRegistry,
   healthCheckRouter,
 } from "./healthCheck/healthCheck.router";
+import { listRegistry, listRouter } from "./lists/list.router";
 import { projectRegistry, projectRouter } from "./projects/projects.router";
 import { userRegistry, userRouter } from "./user/user.router";
 import { boardRouter } from "./board/board.router";
@@ -13,7 +14,8 @@ export const Registries = [
   authRegistry,
   userRegistry,
   projectRegistry,
-  boardRegistry
+  boardRegistry,
+  listRegistry,
 ];
 
 export const Modules = {
@@ -22,4 +24,5 @@ export const Modules = {
   userRouter,
   projectRouter,
   boardRouter,
+  listRouter,
 };

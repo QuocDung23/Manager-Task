@@ -1,1 +1,5 @@
 export * from './getBoard.req'
+export * from './updateBoard.req'
+export * from './deleteBoard.req'
+export * from './addMemberBoard.req'
+export * from './createBoard.req'

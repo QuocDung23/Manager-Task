@@ -15,11 +15,15 @@ import { UserStatus } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import { Request, Response, NextFunction } from "express";
 import { PermissionRepository } from "@/modules/permission/permission.repository";
+import { ListRepository } from "@/modules/lists/list.repository";
+import { BoardRepository } from "@/modules/board/board.repository";
 
 class AuthMiddleware extends BaseAutoBindMiddleware {
   constructor(
     private readonly userRepository = new UserRepository(),
     private readonly permissionRepo = new PermissionRepository(),
+    private readonly listRepository = new ListRepository(),
+    private readonly boardRepository = new BoardRepository(),
   ) {
     super();
   }
@@ -217,10 +221,63 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
           throw new NotFoundException("Board Not Found");
         }
 
+        // Nếu user có role ở project-level (vd: PROJECT_ADMIN) thì vẫn nên được phép
+        // thao tác trong phạm vi các board thuộc project đó.
+        const board = await this.boardRepository.getBoardById({ id: boardId });
+        if (!board) {
+          throw new NotFoundException("Board Not Found");
+        }
+
         const hasPermission = await this.permissionRepo.checkAnyPermission(
           user.id,
           permissions,
-          { boardId },
+          { boardId, projectId: board.projectId },
+        );
+
+        if (!hasPermission) {
+          throw new ForbiddenException();
+        }
+
+        next();
+      } catch (error) {
+        next(error);
+      }
+    };
+  }
+
+  /**
+   * Middleware kiểm tra quyền theo listId.
+   * Tự tìm `boardId` của list, rồi check permission theo context `{ boardId }`.
+   */
+  verifyListPermission(...permissions: string[]) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const user = (req as any).user;
+        if (!user) {
+          throw new UnauthorizedException("Unverified");
+        }
+
+        const listId = ((req.params as any)?.id ||
+          (req.body as any)?.id ||
+          (req.query as any)?.id) as string;
+        if (!listId) {
+          throw new NotFoundException("List Not Found");
+        }
+
+        const list = await this.listRepository.getListById(listId);
+        if (!list) {
+          throw new NotFoundException("List Not Found");
+        }
+
+        const board = await this.boardRepository.getBoardById({ id: list.boardId });
+        if (!board) {
+          throw new NotFoundException("Board Not Found");
+        }
+
+        const hasPermission = await this.permissionRepo.checkAnyPermission(
+          user.id,
+          permissions,
+          { boardId: list.boardId, projectId: board.projectId },
         );
 
         if (!hasPermission) {

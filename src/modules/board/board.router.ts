@@ -15,11 +15,16 @@ import { BoardController } from "./board.controller";
 import { updateBoardRequestSchema, updateBoardRequestValidationSchema } from "./dtos/requests/updateBoard.req";
 import { deleteBoardRequestSchema, deleteBoardRequestValidationSchema } from "./dtos/requests/deleteBoard.req";
 import { addMemberBoardRequestSchema, addMemberBoardRequestValidationSchema } from "./dtos/requests/addMemberBoard.req";
+import { ListController } from "../lists/list.controller";
+import { createListRequestSchema, createListRequestValidationSchema } from "../lists/dtos/requests/createList.req";
+import { listResponseSchema } from "../lists/dtos";
 
 export const boardRegistry = new OpenAPIRegistry();
 const boardController = new BoardController();
+const listController = new ListController();
 const router = express.Router({ mergeParams: true });
 autoBindUtil(boardController);
+autoBindUtil(listController);
 
 boardRegistry.registerPath({
   method: "get",
@@ -64,7 +69,7 @@ router.put(
   authMiddleware.verifyBoardPermission(BoardPermissions.UPDATE_BOARD),
   validateRequestMiddleware(updateBoardRequestValidationSchema),
   boardController.updateBoard,
-)
+);
 
 boardRegistry.registerPath({
   method: 'delete',
@@ -72,7 +77,7 @@ boardRegistry.registerPath({
   tags: ['Boards'],
   request: deleteBoardRequestSchema,
   responses: createApiResponse(boardResponseSchema, 'Success', StatusCodes.OK),
-})
+});
 router.delete(
   '/:boardId/delete',
   authMiddleware.verifyAccessToken,
@@ -94,6 +99,21 @@ router.post(
   authMiddleware.verifyBoardPermission(BoardPermissions.ADD_MEMBER_BOARD),
   validateRequestMiddleware(addMemberBoardRequestValidationSchema),
   boardController.addMemberToBoard,
+);
+
+boardRegistry.registerPath({
+  method: "post",
+  path: "/board/{boardId}/create-lists",
+  tags: ["Boards"],
+  request: createListRequestSchema,
+  responses: createApiResponse(listResponseSchema, "Success", StatusCodes.CREATED),
+});
+router.post(
+  "/:boardId/create-lists",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyBoardPermission(BoardPermissions.CREATE_LIST),
+  validateRequestMiddleware(createListRequestValidationSchema),
+  listController.createList,
 );
 
 export const boardRouter = router;
