@@ -4,6 +4,7 @@ import { PrismaService } from "../data/prisma.client";
 export class ListRepository {
   constructor(private readonly prisma = new PrismaService()) {}
 
+  //get all tất cả các list 
   getLists(args: {
     boardId: string;
     name?: string;
@@ -66,7 +67,13 @@ export class ListRepository {
     return this.prisma.lists.create({ data });
   }
 
-  async updateList({id, list}: {id: string, list: Prisma.listsUpdateInput}): Promise<lists> {
+  async updateList({
+    id,
+    list,
+  }: {
+    id: string;
+    list: Prisma.listsUpdateInput;
+  }): Promise<lists> {
     const { ...data } = list;
     return this.prisma.lists.update({
       where: { id },
@@ -76,11 +83,54 @@ export class ListRepository {
 
   async deleteList(id: string): Promise<lists> {
     return this.prisma.lists.update({
-      where: { id: id, },
+      where: { id: id },
       data: {
         deletedAt: new Date(),
         status: ListStatus.INACTIVE,
       },
     });
+  }
+
+  //lấy tát cả list bằng listIds
+  async getListsByIds(args: {
+    boardId: string;
+    listIds: string[];
+  }): Promise<lists[]> {
+    const { boardId, listIds } = args;
+
+    return this.prisma.lists.findMany({
+      where: {
+        boardId,
+        id: { in: listIds },
+        deletedAt: null,
+      },
+      orderBy: {
+        order: "asc",
+      },
+    });
+  }
+
+  async countListsByBoardId(boardId: string): Promise<number> {
+    return this.prisma.lists.count({
+      where: {
+        boardId,
+        deletedAt: null,
+      },
+    });
+  }
+
+  async updateOrders(
+    updates: Array<{ id: string; order: number }>,
+  ): Promise<lists[]> {
+    if (updates.length === 0) return [];
+
+    return this.prisma.$transaction(
+      updates.map((u) =>
+        this.prisma.lists.update({
+          where: { id: u.id },
+          data: { order: u.order },
+        }),
+      ),
+    );
   }
 }

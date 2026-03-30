@@ -7,6 +7,7 @@ import authMiddleware from "@/common/middlewares/auth.middleware";
 import { BoardPermissions, ListPermissions } from "@/common/enums/permissions";
 import { ListController } from "./list.controller";
 import { listResponseSchema } from "./dtos/responses/list.res";
+import z from "zod";
 import {
   getAllListRequestSchema,
   getAllListRequestValidationSchema,
@@ -15,6 +16,10 @@ import {
   getListByIdRequestSchema,
   getListByIdRequestValidationSchema,
 } from "./dtos/requests/getListById.req";
+import {
+  reorderListRequestSchema,
+  reorderListRequestValidationSchema,
+} from "./dtos/requests/reorderList.req";
 import {
   deleteListRequestSchema,
   deleteListRequestValidationSchema,
@@ -85,6 +90,26 @@ router.delete(
   authMiddleware.verifyListPermission(ListPermissions.DELETE_LIST),
   validateRequestMiddleware(deleteListRequestValidationSchema),
   listController.deleteList,
+);
+
+listRegistry.registerPath({
+  method: "patch",
+  path: "/list/{boardId}/reorderList",
+  tags: ["Lists"],
+  request: reorderListRequestSchema,
+  responses: createApiResponse(
+    z.array(listResponseSchema),
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+
+router.patch(
+  "/:boardId/reorderList",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyBoardPermission(ListPermissions.MOVE_LIST),
+  validateRequestMiddleware(reorderListRequestValidationSchema),
+  listController.reorderLists,
 );
 
 export const listRouter = router;

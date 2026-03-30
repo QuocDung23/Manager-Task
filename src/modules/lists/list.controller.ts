@@ -7,6 +7,7 @@ import { CreateListRequestDto } from "./dtos/requests/createList.req";
 import { GetListByIdRequestDto } from "./dtos/requests/getListById.req";
 import { UpdateListRequestDto } from "./dtos/requests/updateList.req";
 import { DeleteListRequestDto } from "./dtos/requests/delete.req";
+import { ReorderListRequestDto } from "./dtos/requests/reorderList.req";
 
 export class ListController {
   constructor(private readonly listService = new ListService()) {}
@@ -81,8 +82,24 @@ export class ListController {
 
   async deleteList(req: Request, res: Response): Promise<Response> {
     const id = req.params.id as string;
-    const dto = new DeleteListRequestDto({id} as DeleteListRequestDto);
+    const dto = new DeleteListRequestDto({ id } as DeleteListRequestDto);
     const result = await this.listService.deleteList(dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async reorderLists(req: Request, res: Response): Promise<Response> {
+    const boardId = req.params.boardId as string;
+
+    const reorderListDto = new ReorderListRequestDto({
+      ...(req.body as any),
+      boardId,
+    } as ReorderListRequestDto);
+
+    const result = await this.listService.reorderLists(reorderListDto);
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }

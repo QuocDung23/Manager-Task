@@ -8,8 +8,6 @@ import morgan from "morgan";
 import { openAPIRouter } from "./swagger";
 import { Modules } from "./modules";
 import { appEnv } from "./configs";
-import authMiddleware from "@/common/middlewares/auth.middleware";
-import { BoardPermissions } from "@/common/enums/permissions";
 
 const app: Express = express();
 

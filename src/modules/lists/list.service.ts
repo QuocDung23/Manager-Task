@@ -1,4 +1,4 @@
-import { Exception } from "@tsed/exceptions";
+import { BadRequest, Exception } from "@tsed/exceptions";
 import { ListRepository } from "./list.repository";
 import { GetAllListRequestDto } from "./dtos/requests/getAllList.req";
 import { ListResponseDto } from "./dtos/responses/list.res";
@@ -14,6 +14,7 @@ import { Prisma } from "@prisma/client";
 import { GetListByIdRequestDto } from "./dtos/requests/getListById.req";
 import { UpdateListRequestDto } from "./dtos/requests/updateList.req";
 import { DeleteListRequestDto } from "./dtos/requests/delete.req";
+import { ReorderListRequestDto } from "./dtos/requests/reorderList.req";
 
 export class ListService {
   constructor(
@@ -133,6 +134,64 @@ export class ListService {
     return {
       success: true,
       data: new ListResponseDto(deleteList),
+    };
+  }
+
+  async reorderLists(
+    reorderListDto: ReorderListRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<ListResponseDto[]> | Exception> {
+    const { boardId, listIds } = reorderListDto;
+
+    if (!Array.isArray(listIds) || listIds.length === 0) {
+      throw new BadRequest("listIds is required");
+    }
+
+    // Dedupe + validate FE gửi không được trùng id
+    const uniqueListIds = Array.from(new Set(listIds));
+    if (uniqueListIds.length !== listIds.length) {
+      throw new BadRequest("listIds contains duplicates");
+    }
+
+    // Kiểm tra listIds thuộc đúng board (chống reorder nhầm board)
+    const listsInBoard = await this.listRepository.getListsByIds({
+      boardId,
+      listIds: uniqueListIds,
+    });
+    if (listsInBoard.length !== uniqueListIds.length) {
+      // Không đủ record => listId không thuộc board hoặc không tồn tại
+      throw new NotFoundException("List not found");
+    }
+
+    // Reorder đúng nghĩa là reorder toàn bộ active lists của board.
+    // Nếu FE chỉ gửi một phần list thì BE gán lại order theo index của phần đó,
+    // sẽ làm thứ tự tổng thể bị "đè" / xung đột.
+    const totalActiveLists = await this.listRepository.countListsByBoardId(
+      boardId,
+    );
+    if (uniqueListIds.length !== totalActiveLists) {
+      throw new BadRequest(
+        "listIds must contain all active lists of this board (to reorder correctly)",
+      );
+    }
+
+    const step = 65536;
+    const updates = uniqueListIds.map((id, index) => ({
+      id,
+      order: index * step,
+    }));
+
+    await this.listRepository.updateOrders(updates);
+
+    const updatedLists = await this.listRepository.getListsByIds({
+      boardId,
+      listIds: uniqueListIds,
+    });
+
+    const sorted = updatedLists.sort((a, b) => a.order - b.order);
+
+    return {
+      success: true,
+      data: sorted.map((list) => new ListResponseDto(list as any)) as any,
     };
   }
 }
