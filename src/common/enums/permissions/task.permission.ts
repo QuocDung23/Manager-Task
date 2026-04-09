@@ -1,0 +1,8 @@
+export enum TaskPermissions {
+    UPDATE_TASK = "UPDATE_TASK",
+    DELETE_TASK = "DELETE_TASK",
+    VIEW_TASK = "VIEW_TASK",
+    MOVE_TASK = "MOVE_TASK",
+    ASSIGN_TASK = "ASSIGN_TASK",
+    UNASSIGN_TASK = "UNASSIGN_TASK",
+}

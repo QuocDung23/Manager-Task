@@ -27,6 +27,7 @@ app.use("/user", Modules.userRouter);
 app.use("/project", Modules.projectRouter);
 app.use("/board", Modules.boardRouter);
 app.use("/list", Modules.listRouter);
+app.use("/task", Modules.taskRouter);
 
 app.use(openAPIRouter);
 

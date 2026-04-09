@@ -2,6 +2,7 @@ import {
   BoardPermissions,
   ListPermissions,
   ProjectPermissions,
+  TaskPermissions,
   UserPermissions,
 } from "@/common/enums/permissions";
 import { BoardRole, ProjectRole, UserRole } from "@/common/enums/roles";
@@ -14,6 +15,7 @@ const allPermissions = [
   ...Object.values(ProjectPermissions),
   ...Object.values(BoardPermissions),
   ...Object.values(ListPermissions),
+  ...Object.values(TaskPermissions)
 ];
 
 const rolePermissionMap: Record<string, readonly string[]> = {
@@ -22,6 +24,7 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     ...Object.values(ProjectPermissions),
     ...Object.values(BoardPermissions),
     ...Object.values(ListPermissions),
+    ...Object.values(TaskPermissions),
   ],
   [UserRole.USER]: [
     UserPermissions.CREATE_PROJECT,
@@ -39,12 +42,14 @@ const rolePermissionMap: Record<string, readonly string[]> = {
 
     ...Object.values(BoardPermissions),
     ...Object.values(ListPermissions),
+    ...Object.values(TaskPermissions),
   ],
   [ProjectRole.PROJECT_MEMBER]: [
     ProjectPermissions.VIEW_PROJECT,
     ProjectPermissions.CREATE_BOARD,
 
     ...Object.values(ListPermissions),
+    ...Object.values(TaskPermissions),
   ],
 
   [BoardRole.BOARD_ADMIN]: [
@@ -57,12 +62,14 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     BoardPermissions.CREATE_LIST,
 
     ...Object.values(ListPermissions),
+    ...Object.values(TaskPermissions),
   ],
   [BoardRole.BOARD_MEMBER]: [
     BoardPermissions.VIEW_BOARD,
     BoardPermissions.CREATE_LIST,
 
     ...Object.values(ListPermissions),
+    ...Object.values(TaskPermissions),
   ]
 };
 

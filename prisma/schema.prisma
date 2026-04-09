@@ -53,6 +53,21 @@ enum ListStatus {
   INACTIVE @map("inactive")
 }
 
+enum TaskStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum TaskStatusAction {
+  TODO        @map("todo")
+  IN_PROGRESS @map("in_progress")
+  IN_REVIEW   @map("in_review")
+  DONE        @map("done")
+  PAUSED      @map("paused")
+  FIXED       @map("fixed")
+  CANCELLED   @map("cancelled")
+}
+
 enum ProjectMemberStatus {
   ACTIVE   @map("active")
   INACTIVE @map("inactive")
@@ -94,7 +109,7 @@ model users {
   tokens         tokens[]
   otp            otps?
   project        projects[]
-  board         boards[]
+  board          boards[]
   // socialAccounts socialAccounts[]
   projectMembers projectMembers[]
   boardMembers   boardMembers[]
@@ -153,7 +168,7 @@ model userRoles {
 
 model permissions {
   id          String           @id @default(uuid())
-  name        String           @map("permission_name") @unique
+  name        String           @unique @map("permission_name")
   description String
   status      PermissionStatus @default(ACTIVE)
 
@@ -200,7 +215,7 @@ model projects {
   deletedAt DateTime? @map("deleted_at")
 
   projectMembers projectMembers[]
-  board boards[]
+  board          boards[]
 
   @@map("projects")
 }
@@ -223,34 +238,34 @@ model projectMembers {
 }
 
 model boards {
-  id        String @id @default(uuid())
-  name      String
+  id          String      @id @default(uuid())
+  name        String
   description String
-  projectId String @map("project_id")
-  project   projects @relation(fields: [projectId], references: [id])
-  status    BoardStatus @default(ACTIVE)
-  userId String @map("user_id")
-  user users @relation(fields: [userId], references: [id])
+  projectId   String      @map("project_id")
+  project     projects    @relation(fields: [projectId], references: [id])
+  status      BoardStatus @default(ACTIVE)
+  userId      String      @map("user_id")
+  user        users       @relation(fields: [userId], references: [id])
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
   boardMembers boardMembers[]
-  lists lists[]
+  lists        lists[]
 
   @@map("boards")
 }
 
 model boardMembers {
-  id String @id @default(uuid())
-  userId String @map("user_id")
-  user users @relation(fields: [userId], references: [id])
-  boardId String @map("board_id")
-  board boards @relation(fields: [boardId], references: [id])
-  roleId String @map("role_id")
-  role roles @relation(fields: [roleId], references: [id])
-  status BoardMemberStatus @default(ACTIVE)
+  id      String            @id @default(uuid())
+  userId  String            @map("user_id")
+  user    users             @relation(fields: [userId], references: [id])
+  boardId String            @map("board_id")
+  board   boards            @relation(fields: [boardId], references: [id])
+  roleId  String            @map("role_id")
+  role    roles             @relation(fields: [roleId], references: [id])
+  status  BoardMemberStatus @default(ACTIVE)
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -259,18 +274,37 @@ model boardMembers {
   @@map("boardMembers")
 }
 
-model lists{
-  id String @id @default(uuid())
-  name String
+model lists {
+  id          String     @id @default(uuid())
+  name        String
   description String
-  order Int @default(0)
-  boardId String @map("board_id")
-  board boards @relation(fields: [boardId], references: [id])
-  status ListStatus @default(ACTIVE)
+  order       Int        @default(0)
+  boardId     String     @map("board_id")
+  board       boards     @relation(fields: [boardId], references: [id])
+  status      ListStatus @default(ACTIVE)
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
+  tasks tasks[]
+
   @@map("lists")
+}
+
+model tasks {
+  id          String     @id @default(uuid())
+  name        String
+  description String
+  orderTask   Int        @default(0)
+  dueDate     DateTime?  @map("due_date")
+  listId      String     @map("list_id")
+  list        lists      @relation(fields: [listId], references: [id])
+  status      TaskStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("tasks")
 }

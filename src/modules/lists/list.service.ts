@@ -9,7 +9,6 @@ import {
   PaginationUtils,
 } from "@/common";
 import { CreateListRequestDto } from "./dtos/requests/createList.req";
-import { BoardRepository } from "../board/board.repository";
 import { Prisma } from "@prisma/client";
 import { GetListByIdRequestDto } from "./dtos/requests/getListById.req";
 import { UpdateListRequestDto } from "./dtos/requests/updateList.req";
@@ -19,7 +18,6 @@ import { ReorderListRequestDto } from "./dtos/requests/reorderList.req";
 export class ListService {
   constructor(
     private readonly listRepository = new ListRepository(),
-    private readonly boardRepository = new BoardRepository(),
   ) {}
 
   async getAllLists(
@@ -70,13 +68,6 @@ export class ListService {
   async createList(
     createList: CreateListRequestDto,
   ): Promise<HttpResponseBodySuccessDto<ListResponseDto> | Exception> {
-    const board = await this.boardRepository.getBoardById({
-      id: createList.boardId,
-    });
-    if (!board) {
-      throw new NotFoundException("Board not found");
-    }
-
     //chọn 65536 vì nó = 2^16 đủ lớn để có thể drag drop ôn định
     const order =
       (await this.listRepository.getMaxOrder(createList.boardId)) + 65536;

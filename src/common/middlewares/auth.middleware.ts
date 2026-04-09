@@ -17,6 +17,7 @@ import { Request, Response, NextFunction } from "express";
 import { PermissionRepository } from "@/modules/permission/permission.repository";
 import { ListRepository } from "@/modules/lists/list.repository";
 import { BoardRepository } from "@/modules/board/board.repository";
+import { TaskRepository } from "@/modules/tasks/task.repository";
 
 class AuthMiddleware extends BaseAutoBindMiddleware {
   constructor(
@@ -24,6 +25,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
     private readonly permissionRepo = new PermissionRepository(),
     private readonly listRepository = new ListRepository(),
     private readonly boardRepository = new BoardRepository(),
+    private readonly taskRepository = new TaskRepository(),
   ) {
     super();
   }
@@ -251,27 +253,32 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
    */
   verifyListPermission(...permissions: string[]) {
     return async (req: Request, res: Response, next: NextFunction) => {
-      try {
+      try {        
         const user = (req as any).user;
         if (!user) {
           throw new UnauthorizedException("Unverified");
         }
 
-        const listId = ((req.params as any)?.id ||
-          (req.body as any)?.id ||
-          (req.query as any)?.id) as string;
+        const params = req.params as any;
+        const body = req.body as any;
+        const query = req.query as any;
+        const listId = (params?.listId ??
+          params?.id ??
+          body?.listId ??
+          query?.listId) as string | undefined;
+        
         if (!listId) {
           throw new NotFoundException("List Not Found");
         }
 
         const list = await this.listRepository.getListById(listId);
         if (!list) {
-          throw new NotFoundException("List Not Found");
+          throw new NotFoundException(`List Not Found`);
         }
 
         const board = await this.boardRepository.getBoardById({ id: list.boardId });
         if (!board) {
-          throw new NotFoundException("Board Not Found");
+          throw new NotFoundException(`Board Not Found`);
         }
 
         const hasPermission = await this.permissionRepo.checkAnyPermission(
@@ -289,6 +296,76 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         next(error);
       }
     };
+  }
+
+
+  verifyTaskPermission(...permissions: string[]) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const user = (req as any).user;
+        if (!user) {
+          throw new UnauthorizedException("Unverified");
+        }
+
+        const params = req.params as any;
+        const body = req.body as any;
+        const query = req.query as any;
+
+        // List-scoped endpoints provide listId directly (e.g. /task/:listId/tasks).
+        // Task-scoped endpoints provide task id (e.g. /task/:id), so resolve listId via task.
+        let listId = (params?.listId ??
+          body?.listId ??
+          query?.listId) as string | undefined;
+
+        if (!listId) {
+          const taskId = (params?.taskId ??
+            params?.id ??
+            body?.taskId ??
+            body?.id ??
+            query?.taskId ??
+            query?.id) as string | undefined;
+
+          if (taskId) {
+            const task = await this.taskRepository.getTaskById(taskId);
+            if (!task) {
+              throw new NotFoundException(`Task Not Found (${taskId})`);
+            }
+            listId = task.listId;
+          }
+        }
+
+        if (!listId) {
+          throw new NotFoundException("List Not Found");
+        }
+
+        const list = await this.listRepository.getListById(listId);
+        if (!list) {
+          throw new NotFoundException(`List Not Found (${listId})`);
+        }
+
+        const board = await this.boardRepository.getBoardById({
+          id: list.boardId,
+        });
+        if (!board) {
+          throw new NotFoundException(`Board Not Found (${list.boardId})`);
+        }
+
+        const hasPermission = await this.permissionRepo.checkAnyPermission(
+          user.id,
+          permissions,
+          { boardId: list.boardId, projectId: board.projectId },
+        );
+
+        if (!hasPermission) {
+          throw new ForbiddenException();
+        }
+
+        next();
+      }
+      catch (error) {
+        next(error);
+      }
+    }
   }
 }
 
