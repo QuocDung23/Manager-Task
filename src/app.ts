@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import cors from "cors";
+import cors, { CorsOptions } from "cors";
 import express, { Express } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -16,8 +16,28 @@ app.use(express.json());
 // Set the application to trust the reverse proxy
 app.set("trust proxy", true);
 
+const allowedOrigins = appEnv.CORS_ORIGIN.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+};
+
 // Middlewares
-app.use(cors({ origin: appEnv.CORS_ORIGIN, credentials: true }));
+app.use(cors(corsOptions));
 app.use(helmet());
 app.use(morgan("combined"));
 
