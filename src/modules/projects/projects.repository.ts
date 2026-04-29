@@ -31,28 +31,32 @@ export class ProjectsRepository {
     skip: number;
     take: number;
   }): Promise<[projects[], number]> {
+    const whereCondition: Prisma.projectsWhereInput = {
+      userId,
+      status,
+      deletedAt: { equals: null },
+    };
+    if (name) {
+      whereCondition.OR = [
+        { name: { contains: name } },
+        { description: { contains: name } }
+      ];
+    }
+
     return Promise.all([
       this.prismaService.projects.findMany({
-        where: {
-          userId,
-          name,
-          status,
-          deletedAt: { equals: null },
-        },
+        where: whereCondition,
         skip,
         take,
+        orderBy: {
+          createdAt: 'desc'
+        }
       }),
       this.prismaService.projects.count({
-        where: {
-          userId,
-          name,
-          status,
-          deletedAt: { equals: null },
-        },
+        where: whereCondition,
       }),
     ]);
   }
-
   async getProject({
     id,
     name,

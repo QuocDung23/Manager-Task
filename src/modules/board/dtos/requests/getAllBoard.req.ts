@@ -17,10 +17,10 @@ export class GetAllBoardRequestDto {
 export const getAllBoardRequestQuery = z.object({
     name: z.string().optional(),
     status: z.enum(BoardStatus).optional(),
-}).strict()
+})
 export const getAllBoardRequestParamsSchema = z.object({
     projectId: z.string().uuid(),
-}).strict()
+})
 
 export const getAllBoardRequestValidationSchema: ZodValidationSchema = {
     query: getAllBoardRequestQuery,

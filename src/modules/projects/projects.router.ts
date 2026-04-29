@@ -18,7 +18,7 @@ import {
 } from "./dtos";
 import { StatusCodes } from "http-status-codes";
 import authMiddleware from "@/common/middlewares/auth.middleware";
-import { ProjectPermissions, UserPermissions } from "@/common/enums/permissions";
+import { ProjectPermissions } from "@/common/enums/permissions";
 import {
   getAllProjectRequestSchema,
   getAllProjectRequestValidationSchema,
@@ -55,7 +55,6 @@ projectRegistry.registerPath({
 router.get(
   "/getAlls",
   authMiddleware.verifyAccessToken,
-  authMiddleware.verifySystemPermission(ProjectPermissions.VIEW_PROJECT),
   validateRequestMiddleware(getAllProjectRequestValidationSchema),
   projectController.getAllProject,
 );

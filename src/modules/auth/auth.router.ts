@@ -25,7 +25,6 @@ import authMiddleware from "@/common/middlewares/auth.middleware";
 import { ProjectController } from "../projects/projects.controller";
 import { projectResponseSchema } from "../projects/dtos/response/project.res";
 import { createProjectRequestSchema, createProjectRequestValidationSchema } from "../projects/dtos/request/createProject.req";
-import { UserPermissions } from "@/common/enums/permissions";
 
 export const authRegistry = new OpenAPIRegistry();
 
@@ -113,7 +112,6 @@ authRegistry.registerPath({
 router.post(
   '/create-project',
   authMiddleware.verifyAccessToken,
-  authMiddleware.verifySystemPermission(UserPermissions.CREATE_PROJECT),
   validateRequestMiddleware(createProjectRequestValidationSchema),
   projectController.createProject,
 )
