@@ -36,16 +36,18 @@ export class UserServicer {
     getUsersRequestDto: GetUsersRequestDto,
     paginationDto: PaginationDto,
   ): Promise<HttpResponseBodySuccessDto<GetUserResponseDto[]>> {
-    const { name, status } = getUsersRequestDto;
+    const { name, email, status } = getUsersRequestDto;
     const paginationUtils = new PaginationUtils().extractSkipTakeFromPagination(
       paginationDto,
     );
+    const { skip, take } = paginationUtils;
 
     const [user, totalUser] = await this.userRepository.findUsers({
       name: name as string,
+      email: email as string,
       status: status,
-      skip: 1,
-      take: 10,
+      skip,
+      take,
     });
 
     const userRespone = user.map((user) => new GetUserResponseDto(user));
@@ -57,7 +59,5 @@ export class UserServicer {
     };
   }
 
-  async getMyInfo() {
-	
-  }
+  async getMyInfo() {}
 }

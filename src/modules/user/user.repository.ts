@@ -7,29 +7,38 @@ export class UserRepository {
 
   async findUsers({
     name,
+    email,
     status,
     skip,
     take,
   }: {
-    name: string;
+    name?: string;
+    email?: string;
     status?: UserStatus;
     skip: number;
     take: number;
   }): Promise<[users[], number]> {
+    const orConditions: Prisma.usersWhereInput[] = [];
+    if (name) {
+      orConditions.push({ name: { contains: name, mode: "insensitive" as const } });
+    }
+    if (email) {
+      orConditions.push({ email: { contains: email, mode: "insensitive" as const } });
+    }
+
+    const where: Prisma.usersWhereInput = {
+      ...(status !== undefined ? { status } : {}),
+      ...(orConditions.length > 0 ? { OR: orConditions } : {}),
+    };
+
     return Promise.all([
       this.prismaService.users.findMany({
-        where: {
-          name: name,
-          status: status,
-        },
-        skip: skip,
-        take: take,
+        where,
+        skip,
+        take,
       }),
       this.prismaService.users.count({
-        where: {
-          name: name,
-          status: status,
-        },
+        where,
       }),
     ]);
   }
