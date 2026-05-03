@@ -2,6 +2,7 @@ import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { ProjectController } from "./projects.controller";
 import { BoardController } from "../board/board.controller";
 import express from "express";
+import { z } from "zod";
 import { autoBindUtil, validateRequestMiddleware } from "@/common";
 import {
   getProjectSchema,
@@ -11,8 +12,6 @@ import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
   addProjectMemberRequestSchema,
   addProjectMemberRequestValidationSchema,
-  createProjectRequestSchema,
-  createProjectRequestValidationSchema,
   projectMemberResponseSchema,
   projectResponseSchema,
 } from "./dtos";
@@ -148,7 +147,7 @@ projectRegistry.registerPath({
   tags: ["Projects"],
   request: addProjectMemberRequestSchema,
   responses: createApiResponse(
-    projectMemberResponseSchema,
+    z.array(projectMemberResponseSchema),
     "Success",
     StatusCodes.OK,
   ),

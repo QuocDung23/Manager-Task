@@ -1,6 +1,6 @@
 import { projects, projectsPartialWithRelations } from "@/models";
 import { Prisma, PrismaService } from "../data";
-import { ProjectStatus } from "@prisma/client";
+import { ProjectMemberStatus, ProjectStatus } from "@prisma/client";
 
 export class ProjectsRepository {
   constructor(private readonly prismaService = new PrismaService()) {}
@@ -32,14 +32,29 @@ export class ProjectsRepository {
     take: number;
   }): Promise<[projects[], number]> {
     const whereCondition: Prisma.projectsWhereInput = {
-      userId,
       status,
       deletedAt: { equals: null },
+      OR: [
+        { userId },
+        {
+          projectMembers: {
+            some: {
+              userId,
+              status: ProjectMemberStatus.ACTIVE,
+              deletedAt: null,
+            },
+          },
+        },
+      ],
     };
     if (name) {
-      whereCondition.OR = [
-        { name: { contains: name } },
-        { description: { contains: name } }
+      whereCondition.AND = [
+        {
+          OR: [
+            { name: { contains: name } },
+            { description: { contains: name } },
+          ],
+        },
       ];
     }
 
