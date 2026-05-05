@@ -11,9 +11,12 @@ import {
   updateAvatarRequestBodySchema,
   updateAvatarRequestValidationSchema,
   getUsersRequestValidationSchema,
+  changePasswordRequestSchema,
+  changePasswordRequestValidationSchema,
 } from "./dtos/request";
 import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
+  changPasswordResponseSchema,
   getUserResponseSchema,
   myInfomationResponseSchema,
   updateAvatarResponseSchema,
@@ -55,11 +58,7 @@ userRegistry.registerPath({
     StatusCodes.OK,
   ),
 });
-router.get(
-  "/me",
-  authMiddleware.verifyAccessToken,
-  userController.getMyInfo,
-);
+router.get("/me", authMiddleware.verifyAccessToken, userController.getMyInfo);
 
 userRegistry.registerPath({
   method: "get",
@@ -97,6 +96,24 @@ router.patch(
   uploadMiddleware.single("avatar"),
   validateRequestMiddleware(updateAvatarRequestValidationSchema),
   userController.updateAvatar,
+);
+
+userRegistry.registerPath({
+  method: "patch",
+  path: "/user/me/password",
+  tags: ["User"],
+  request: changePasswordRequestSchema,
+  responses: createApiResponse(
+    changPasswordResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.patch(
+  "/me/password",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(changePasswordRequestValidationSchema),
+  userController.changePassword,
 );
 
 export const userRouter = router;

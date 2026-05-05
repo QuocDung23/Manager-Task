@@ -7,7 +7,7 @@ import {
 import { AuthRepository } from "./auth.repository";
 import { RegisterRequestDto } from "./dtos/requests/register.req";
 import { AccountResDto } from "./dtos/responses/account.res";
-import { Exception } from "@tsed/exceptions";
+import { BadRequest, Exception } from "@tsed/exceptions";
 import { genSalt, hash } from "bcrypt";
 import { Prisma, UserStatus } from "@prisma/client";
 import { LoginRequestDto } from "./dtos/requests";
@@ -23,6 +23,7 @@ import { UserRepository } from "../user/user.repository";
 import { VerifyRequestDto } from "./dtos/requests/verifyOtp.req";
 import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
 import { ref } from "node:process";
+import { ChangePasswordRequestDto } from "../user/dtos";
 
 export class AuthService {
   constructor(
@@ -185,33 +186,61 @@ export class AuthService {
     };
   }
 
-  async refreshToken(myInfomation: MyInfomationResDto): Promise<HttpResponseBodySuccessDto<LoginResponseDto | Exception>> {
-    const {accessToken, refreshToken} = await signJWT({
-      userId: myInfomation.id
-    })
+  async refreshToken(
+    myInfomation: MyInfomationResDto,
+  ): Promise<HttpResponseBodySuccessDto<LoginResponseDto | Exception>> {
+    const { accessToken, refreshToken } = await signJWT({
+      userId: myInfomation.id,
+    });
 
     await this.authRepository.createToken({
       token: {
         refreshToken: refreshToken,
         user: {
           connect: {
-            id: myInfomation.id
-          }
-        }
-      }
-    })
+            id: myInfomation.id,
+          },
+        },
+      },
+    });
 
     return {
       success: true,
       data: {
         accessToken: accessToken,
-        refreshToken: refreshToken
+        refreshToken: refreshToken,
       },
       cookies: {
-        accessToken: accessToken
-      }
-    }
+        accessToken: accessToken,
+      },
+    };
   }
 
+  async changPassword(
+    userId: string,
+    dto: ChangePasswordRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<void>> {
+    const account = await this.authRepository.findAccountByUserId(userId);
+    if (!account) {
+      throw new NotFoundException("Not Found Account");
+    }
 
+    const hashCurrentPassword = await hash(dto.currentPassword, account.salt);
+    if (hashCurrentPassword !== account.password) {
+      throw new BadRequest("Current password is incorrect");
+    }
+    const newSalt = await genSalt(10);
+    const newPassword = await hash(dto.newPassword, newSalt);
+
+    await this.authRepository.updateAccountPassword({
+      userId,
+      passwordHash: newPassword,
+      salt: newSalt,
+    });
+
+    return {
+      success: true,
+      data: undefined,
+    };
+  }
 }

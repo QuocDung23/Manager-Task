@@ -1,11 +1,19 @@
 import { Exception } from "@tsed/exceptions";
 import { Request, Response } from "express";
 import { HttpResponseDto, PaginationDto } from "@/common";
-import { GetUserByUserIdRequestDto, GetUsersRequestDto } from "./dtos";
+import {
+  ChangePasswordRequestDto,
+  GetUserByUserIdRequestDto,
+  GetUsersRequestDto,
+} from "./dtos";
 import { UserServicer } from "./user.service";
+import { AuthService } from "../auth/auth.service";
 
 export class UserController {
-  constructor(private readonly userService = new UserServicer()) {}
+  constructor(
+    private readonly userService = new UserServicer(),
+    private readonly authService = new AuthService(),
+  ) {}
 
   async getUserByUserId(req: Request, res: Response): Promise<Response> {
     const { userId } = req.params;
@@ -25,7 +33,9 @@ export class UserController {
   }
 
   async getAllUsers(req: Request, res: Response): Promise<Response> {
-    const getUsersRequest: GetUsersRequestDto = new GetUsersRequestDto(req.query);
+    const getUsersRequest: GetUsersRequestDto = new GetUsersRequestDto(
+      req.query,
+    );
     const pagination: PaginationDto = new PaginationDto(req.query);
 
     const result = await this.userService.getAllUsers(
@@ -77,6 +87,16 @@ export class UserController {
       return new HttpResponseDto().exception(res, result);
     }
 
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async changePassword(req: Request, res: Response): Promise<Response> {
+    const userId = (req as any).user.id;
+    const dto = new ChangePasswordRequestDto(req.body);
+    const result = await this.authService.changPassword(userId, dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
     return new HttpResponseDto().success(res, result);
   }
 }

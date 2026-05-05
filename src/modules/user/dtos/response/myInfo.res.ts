@@ -1,5 +1,6 @@
 import { users } from "@/models";
 import { UserStatus } from "@prisma/client";
+import z from "zod";
 
 export class MyInfomationResDto {
   id: string;
@@ -28,3 +29,17 @@ export class MyInfomationResDto {
 		this.deletedAt = user.deletedAt ?? null;
 	}
 }
+
+export const myInfomationResponseSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+  name: z.string(),
+  bio: z.string().nullable(),
+  address: z.string().nullable(),
+  avatar: z.string().nullable(),
+  verify: z.boolean(),
+  status: z.enum(UserStatus),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  deletedAt: z.date().nullable(),
+});
