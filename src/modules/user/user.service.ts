@@ -7,12 +7,17 @@ import {
   GetUserByUserIdRequestDto,
   GetUserResponseDto,
   GetUsersRequestDto,
+  MyInfomationResDto,
 } from "./dtos";
 import { UserRepository } from "./user.repository";
 import { PaginationUtils } from "@/common/utils/pagination.utils";
+import { CloudinaryService } from "@/common/service/cloudinary.service";
 
 export class UserServicer {
-  constructor(private readonly userRepository = new UserRepository()) {}
+  constructor(
+    private readonly userRepository = new UserRepository(),
+    private readonly cloudinaryService = new CloudinaryService()
+  ) {}
 
   async getUserByUserId(
     getUserByUserIdRequestDto: GetUserByUserIdRequestDto,
@@ -59,5 +64,38 @@ export class UserServicer {
     };
   }
 
-  async getMyInfo() {}
+  async getMyInfo(
+    userId: string,
+  ): Promise<HttpResponseBodySuccessDto<MyInfomationResDto>> {
+    const user = await this.userRepository.findUser({ userId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    return {
+      success: true,
+      data: new MyInfomationResDto(user),
+    };
+  }
+
+  async updateAvatar(userId: string, file: Express.Multer.File) {
+    const user = await this.userRepository.findUser({ userId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    const updateAvatar = await this.cloudinaryService.uploadAvatar(file, userId);
+
+    const updatedUser = await this.userRepository.updateUser({
+      userId,
+      user: {
+        avatar: updateAvatar.secure_url,
+      },
+    });
+
+    return {
+      success: true,
+      data: { avatar: updatedUser.avatar },
+    };
+  }
 }
