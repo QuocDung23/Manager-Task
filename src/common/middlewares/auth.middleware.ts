@@ -18,6 +18,7 @@ import { PermissionRepository } from "@/modules/permission/permission.repository
 import { ListRepository } from "@/modules/lists/list.repository";
 import { BoardRepository } from "@/modules/board/board.repository";
 import { TaskRepository } from "@/modules/tasks/task.repository";
+import { AuthRepository } from "@/modules/auth/auth.repository";
 
 class AuthMiddleware extends BaseAutoBindMiddleware {
   constructor(
@@ -26,6 +27,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
     private readonly listRepository = new ListRepository(),
     private readonly boardRepository = new BoardRepository(),
     private readonly taskRepository = new TaskRepository(),
+    private readonly authRepository = new AuthRepository(),
   ) {
     super();
   }
@@ -96,7 +98,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
       .find((row) => row.startsWith("refreshToken="))
       ?.split("=")[1];
 
-    if (!refreshToken || !accessToken) {
+    if (!refreshToken) {
       throw new UnauthorizedException();
     }
 
@@ -106,18 +108,32 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         jwtConfig.secretRefreshToken as string,
       ) as ITokenPayload;
 
-      const payloadAccessToken: ITokenPayload = verify(
-        accessToken,
-        jwtConfig.secretAccessToken as string,
-        {
-          ignoreExpiration: true,
-        },
-      ) as ITokenPayload;
-      if (payloadAccessToken.exp > Date.now() / 1000) {
-        throw new OptionalException(
-          StatusCodes.CONFLICT,
-          "accesstoken has not expired yet",
-        );
+      const savedToken = await this.authRepository.findTokenByUserId(
+        payloadRefreshToken.userId,
+      );
+      if (!savedToken || savedToken.refreshToken !== refreshToken) {
+        throw new UnauthorizedException("refresh token is invalid");
+      }
+
+      if (accessToken) {
+        const payloadAccessToken: ITokenPayload = verify(
+          accessToken,
+          jwtConfig.secretAccessToken as string,
+          {
+            ignoreExpiration: true,
+          },
+        ) as ITokenPayload;
+
+        if (payloadAccessToken.userId !== payloadRefreshToken.userId) {
+          throw new UnauthorizedException("token pair mismatch");
+        }
+
+        if (payloadAccessToken.exp > Date.now() / 1000) {
+          throw new OptionalException(
+            StatusCodes.CONFLICT,
+            "accesstoken has not expired yet",
+          );
+        }
       }
 
       const userData = await this.userRepository.findUser({
@@ -141,6 +157,8 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
       if (error instanceof ClientException) {
         throw error;
       }
+
+      throw error;
     }
 
     next();

@@ -84,6 +84,14 @@ export class AuthRepository {
     });
   }
 
+  async findTokenByUserId(userId: string): Promise<tokens | null> {
+    return this.prismaService.tokens.findUnique({
+      where: {
+        userId,
+      },
+    });
+  }
+
   async findAccountByUserId(userId: string): Promise<accountsWithPartialRelations | null>{
     return this.prismaService.accounts.findFirst({
       where: {

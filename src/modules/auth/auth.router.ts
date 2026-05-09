@@ -20,19 +20,30 @@ import z from "zod";
 import {
   verifyRequestSchema,
   verifyRequestValidationSchema,
-} from "./dtos/requests/verifyOtp.req";
+} from "./dtos/requests/verifyAcc.req";
 import authMiddleware from "@/common/middlewares/auth.middleware";
 import { ProjectController } from "../projects/projects.controller";
 import { projectResponseSchema } from "../projects/dtos/response/project.res";
-import { createProjectRequestSchema, createProjectRequestValidationSchema } from "../projects/dtos/request/createProject.req";
+import {
+  createProjectRequestSchema,
+  createProjectRequestValidationSchema,
+} from "../projects/dtos/request/createProject.req";
+import {
+  resetPasswordRequestSchema,
+  resetPasswordRequestValidationSchema,
+} from "./dtos/requests/resetPass.req";
+import {
+  resetPasswordResponseSchema,
+  verifyOtpResponseSchema,
+} from "./dtos/responses";
 
 export const authRegistry = new OpenAPIRegistry();
 
 const authController = new AuthController();
-const projectController = new ProjectController()
+const projectController = new ProjectController();
 const router = express.Router({ mergeParams: true });
 autoBindUtil(authController);
-autoBindUtil(projectController)
+autoBindUtil(projectController);
 
 authRegistry.registerPath({
   method: "post",
@@ -91,29 +102,67 @@ router.post(
 );
 
 authRegistry.registerPath({
-	method: 'post',
-	path: '/auth/refresh-token',
-	tags: ['Auth'],
-	responses: createApiResponse(loginResponseDtoSchema, 'Success', StatusCodes.CREATED),
+  method: "post",
+  path: "/auth/refresh-token",
+  tags: ["Auth"],
+  responses: createApiResponse(
+    loginResponseDtoSchema,
+    "Success",
+    StatusCodes.CREATED,
+  ),
 });
 router.post(
-	'/refresh-token',
-	authMiddleware.verifyRefreshToken,
-	authController.refreshToken,
+  "/refresh-token",
+  authMiddleware.verifyRefreshToken,
+  authController.refreshToken,
 );
 
 authRegistry.registerPath({
-  method: 'post',
-  path: '/auth/create-project',
-  tags: ['Auth'],
+  method: "post",
+  path: "/auth/create-project",
+  tags: ["Auth"],
   request: createProjectRequestSchema,
-  responses: createApiResponse(projectResponseSchema, 'Success', StatusCodes.CREATED),   
-})
+  responses: createApiResponse(
+    projectResponseSchema,
+    "Success",
+    StatusCodes.CREATED,
+  ),
+});
 router.post(
-  '/create-project',
+  "/create-project",
   authMiddleware.verifyAccessToken,
   validateRequestMiddleware(createProjectRequestValidationSchema),
   projectController.createProject,
-)
+);
+
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/verifyOtp",
+  tags: ["Auth"],
+  request: verifyRequestSchema,
+  responses: createApiResponse(verifyOtpResponseSchema, "Success", StatusCodes.OK),
+});
+router.post(
+  "/verifyOtp",
+  validateRequestMiddleware(verifyRequestValidationSchema),
+  authController.verifyOtp,
+);
+
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/resetPassword",
+  tags: ["Auth"],
+  request: resetPasswordRequestSchema,
+  responses: createApiResponse(
+    resetPasswordResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.post(
+  "/resetPassword",
+  validateRequestMiddleware(resetPasswordRequestValidationSchema),
+  authController.resetPassword,
+);
 
 export const authRouter = router;

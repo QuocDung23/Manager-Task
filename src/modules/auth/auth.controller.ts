@@ -8,9 +8,10 @@ import {
   RegisterRequestDto,
   SendOtpRequestDto,
 } from "./dtos/requests";
-import { VerifyRequestDto } from "./dtos/requests/verifyOtp.req";
+import { VerifyRequestDto } from "./dtos/requests/verifyAcc.req";
 import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
 import { ChangePasswordRequestDto } from "../user/dtos";
+import { ResetPasswordRequestDto } from "./dtos/requests/resetPass.req";
 
 export class AuthController {
   constructor(private readonly authService = new AuthService()) {}
@@ -92,5 +93,23 @@ export class AuthController {
     }
 
     return new HttpResponseDto().created(res, result);
+  }
+
+  async verifyOtp(req: Request, res: Response): Promise<Response> {
+    const dto = new VerifyRequestDto(req.body)
+    const result = await this.authService.verifyOtp(dto)
+    if(result instanceof Exception){
+      return new HttpResponseDto().exception(res, result)
+    }
+    return new HttpResponseDto().success(res, result)
+  }
+
+  async resetPassword(req: Request, res: Response): Promise<Response> {
+    const dto = new ResetPasswordRequestDto(req.body)
+    const result = await this.authService.resetPassword(dto)
+    if(result instanceof Exception){
+      return new HttpResponseDto().exception(res, result)
+    }
+    return new HttpResponseDto().success(res, result)
   }
 }

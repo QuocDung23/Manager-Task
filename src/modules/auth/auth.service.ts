@@ -10,20 +10,22 @@ import { AccountResDto } from "./dtos/responses/account.res";
 import { BadRequest, Exception } from "@tsed/exceptions";
 import { genSalt, hash } from "bcrypt";
 import { Prisma, UserStatus } from "@prisma/client";
-import { LoginRequestDto } from "./dtos/requests";
+import { LoginRequestDto, VerifyRequestDto } from "./dtos/requests";
 import { StatusCodes } from "http-status-codes";
 import { signJWT } from "@/common/utils/jwt.utils";
-import { success } from "zod";
 import { OtpService } from "../otps/otp.service";
 import { SendOtpRequestDto } from "./dtos/requests/sendOTP.req";
 import { LoginResponseDto } from "./dtos";
 import { MailService } from "../mail/mail.service";
 import { otpsConfig } from "@/configs";
 import { UserRepository } from "../user/user.repository";
-import { VerifyRequestDto } from "./dtos/requests/verifyOtp.req";
 import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
-import { ref } from "node:process";
 import { ChangePasswordRequestDto } from "../user/dtos";
+import { ResetPasswordRequestDto } from "./dtos/requests/resetPass.req";
+import {
+  ResetPasswordResponseDto,
+  VerifyOtpResponseDto,
+} from "./dtos/responses";
 
 export class AuthService {
   constructor(
@@ -212,6 +214,7 @@ export class AuthService {
       },
       cookies: {
         accessToken: accessToken,
+        refreshToken: refreshToken,
       },
     };
   }
@@ -241,6 +244,59 @@ export class AuthService {
     return {
       success: true,
       data: undefined,
+    };
+  }
+
+  async verifyOtp(
+    dto: VerifyRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<VerifyOtpResponseDto>> {
+    const user = await this.authRepository.findAccount({ email: dto.email });
+    if (!user) {
+      throw new NotFoundException("Email not found");
+    }
+
+    const isOtpValid = await this.otpService.verifyOtp({
+      userId: user.userId,
+      otp: dto.otp,
+    });
+    if (!isOtpValid) {
+      throw new BadRequest("Invalid OTP");
+    }
+
+    return {
+      success: true,
+      data: new VerifyOtpResponseDto(user.user?.email ?? dto.email, true),
+    };
+  }
+
+  async resetPassword(
+    dto: ResetPasswordRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<ResetPasswordResponseDto>> {
+    const user = await this.authRepository.findAccount({ email: dto.email });
+    if (!user) {
+      throw new NotFoundException("Email not found");
+    }
+
+    const isOtpValid = await this.otpService.verifyOtp({
+      userId: user.userId,
+      otp: dto.otp,
+    });
+    if (!isOtpValid) {
+      throw new BadRequest("Invalid OTP");
+    }
+
+    const newSalt = await genSalt(10);
+    const newPassword = await hash(dto.newPassword, newSalt);
+
+    await this.authRepository.updateAccountPassword({
+      userId: user.userId,
+      passwordHash: newPassword,
+      salt: newSalt,
+    });
+
+    return {
+      success: true,
+      data: new ResetPasswordResponseDto(user.user?.email ?? dto.email, true),
     };
   }
 }
