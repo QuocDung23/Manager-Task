@@ -129,10 +129,11 @@ model accounts {
 }
 
 model tokens {
-  id           String @default(uuid())
-  userId       String @unique @map("user_id")
-  user         users  @relation(fields: [userId], references: [id])
-  refreshToken String @unique @map("refresh_token")
+  id           String    @default(uuid())
+  userId       String    @unique @map("user_id")
+  user         users     @relation(fields: [userId], references: [id])
+  refreshToken String    @unique @map("refresh_token")
+  deleteAt     DateTime?
 
   @@map("tokens")
 }

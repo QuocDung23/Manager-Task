@@ -15,7 +15,7 @@ import {
   sendOtpRequestSchema,
   sendOtpRequestValidationSchema,
 } from "./dtos/requests";
-import { loginResponseDtoSchema } from "./dtos/responses";
+import { loginResponseDtoSchema, logoutResponseSchema } from "./dtos/responses";
 import z from "zod";
 import {
   verifyRequestSchema,
@@ -140,7 +140,11 @@ authRegistry.registerPath({
   path: "/auth/verifyOtp",
   tags: ["Auth"],
   request: verifyRequestSchema,
-  responses: createApiResponse(verifyOtpResponseSchema, "Success", StatusCodes.OK),
+  responses: createApiResponse(
+    verifyOtpResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
 });
 router.post(
   "/verifyOtp",
@@ -164,5 +168,14 @@ router.post(
   validateRequestMiddleware(resetPasswordRequestValidationSchema),
   authController.resetPassword,
 );
+
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/logout",
+  tags: ["Auth"],
+  security: [{ bearerAuth: [] }],
+  responses: createApiResponse(logoutResponseSchema, "Success", StatusCodes.OK),
+});
+router.post("/logout", authMiddleware.verifyAccessToken, authController.logout);
 
 export const authRouter = router;

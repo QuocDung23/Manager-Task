@@ -74,6 +74,7 @@ export class AuthRepository {
       },
       update: {
         refreshToken: token.refreshToken,
+        deleteAt: null,
       },
       create: {
         refreshToken: token.refreshToken,
@@ -85,14 +86,17 @@ export class AuthRepository {
   }
 
   async findTokenByUserId(userId: string): Promise<tokens | null> {
-    return this.prismaService.tokens.findUnique({
+    return this.prismaService.tokens.findFirst({
       where: {
         userId,
+        deleteAt: null,
       },
     });
   }
 
-  async findAccountByUserId(userId: string): Promise<accountsWithPartialRelations | null>{
+  async findAccountByUserId(
+    userId: string,
+  ): Promise<accountsWithPartialRelations | null> {
     return this.prismaService.accounts.findFirst({
       where: {
         userId: userId,
@@ -100,7 +104,11 @@ export class AuthRepository {
     });
   }
 
-  async updateAccountPassword(args: { userId: string; passwordHash: string; salt: string }): Promise<void> {
+  async updateAccountPassword(args: {
+    userId: string;
+    passwordHash: string;
+    salt: string;
+  }): Promise<void> {
     await this.prismaService.accounts.updateMany({
       where: {
         userId: args.userId,
@@ -108,6 +116,18 @@ export class AuthRepository {
       data: {
         password: args.passwordHash,
         salt: args.salt,
+      },
+    });
+  }
+
+  async deleteTokenByUserId(userId: string): Promise<void> {
+    await this.prismaService.tokens.updateMany({
+      where: {
+        userId,
+        deleteAt: null,
+      },
+      data: {
+        deleteAt: new Date(),
       },
     });
   }

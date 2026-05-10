@@ -23,6 +23,7 @@ import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
 import { ChangePasswordRequestDto } from "../user/dtos";
 import { ResetPasswordRequestDto } from "./dtos/requests/resetPass.req";
 import {
+  LogoutResponseDto,
   ResetPasswordResponseDto,
   VerifyOtpResponseDto,
 } from "./dtos/responses";
@@ -297,6 +298,17 @@ export class AuthService {
     return {
       success: true,
       data: new ResetPasswordResponseDto(user.user?.email ?? dto.email, true),
+    };
+  }
+
+  async logout(
+    userId: string,
+  ): Promise<HttpResponseBodySuccessDto<LogoutResponseDto>> {
+    await this.authRepository.deleteTokenByUserId(userId);
+
+    return {
+      success: true,
+      data: new LogoutResponseDto("Logout successfully"),
     };
   }
 }

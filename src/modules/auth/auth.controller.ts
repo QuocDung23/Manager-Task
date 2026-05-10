@@ -96,20 +96,31 @@ export class AuthController {
   }
 
   async verifyOtp(req: Request, res: Response): Promise<Response> {
-    const dto = new VerifyRequestDto(req.body)
-    const result = await this.authService.verifyOtp(dto)
-    if(result instanceof Exception){
-      return new HttpResponseDto().exception(res, result)
+    const dto = new VerifyRequestDto(req.body);
+    const result = await this.authService.verifyOtp(dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
     }
-    return new HttpResponseDto().success(res, result)
+    return new HttpResponseDto().success(res, result);
   }
 
   async resetPassword(req: Request, res: Response): Promise<Response> {
-    const dto = new ResetPasswordRequestDto(req.body)
-    const result = await this.authService.resetPassword(dto)
-    if(result instanceof Exception){
-      return new HttpResponseDto().exception(res, result)
+    const dto = new ResetPasswordRequestDto(req.body);
+    const result = await this.authService.resetPassword(dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
     }
-    return new HttpResponseDto().success(res, result)
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async logout(req: Request, res: Response): Promise<Response> {
+    const userId = (req as any).user.id;
+    const result = await this.authService.logout(userId);
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
   }
 }
