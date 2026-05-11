@@ -95,7 +95,8 @@ model users {
   bio     String?
   address String?
   phone   String?
-  avatar  String?
+  //Link ảnh mạc định theo tên chữ cai đầu
+  avatar  String @default("https://ui-avatars.com/api/?name=User&background=random")
   verify  Boolean @default(false)
 
   status UserStatus @default(ACTIVE)

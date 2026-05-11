@@ -1,6 +1,9 @@
+import { getCloudinaryDisplayImageUrl } from "@/common";
 import { users } from "@/models";
 import { UserStatus } from "@prisma/client";
 import z from "zod";
+
+
 
 export class MyInfomationResDto {
   id: string;
@@ -21,7 +24,7 @@ export class MyInfomationResDto {
 		this.name = user.name;
 		this.bio = user.bio ?? null;
 		this.address = user.address ?? null;
-		this.avatar = user.avatar ?? null;
+		this.avatar = getCloudinaryDisplayImageUrl(user.avatar);
 		this.verify = user.verify;
 		this.status = user.status;
 		this.createdAt = user.createdAt;

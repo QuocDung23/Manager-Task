@@ -33,6 +33,7 @@ export class CloudinaryService {
       {
         public_id: `avatar_${userId}`,
         overwrite: true,
+        format: "jpg",
         transformation: [{ width: 300, height: 300, crop: "fill" }],
       },
     );
