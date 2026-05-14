@@ -4,3 +4,4 @@ export * from "./updateAvatar.req";
 // export * from "./myInfomation.req";
 export * from "./changePassword.req";
 export * from "./getUserByEmail.req";
+export * from "./updateUser.req";

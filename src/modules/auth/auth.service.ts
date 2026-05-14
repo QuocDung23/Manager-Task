@@ -48,7 +48,7 @@ export class AuthService {
     const salt = await genSalt(10);
     const hashedPassword = await hash(registerDto.password, salt);
 
-    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(registerDto.name)}&background=random&color=fff&size=256`
+    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(registerDto.name)}&background=random&color=fff&size=256`;
 
     const account: Prisma.accountsCreateInput = {
       salt: salt,
@@ -57,7 +57,7 @@ export class AuthService {
         create: {
           name: registerDto.name,
           email: registerDto.email,
-          avatar: defaultAvatar
+          avatar: defaultAvatar,
         },
       },
     };

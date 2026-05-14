@@ -20,10 +20,14 @@ export class UserRepository {
   }): Promise<[users[], number]> {
     const orConditions: Prisma.usersWhereInput[] = [];
     if (name) {
-      orConditions.push({ name: { contains: name, mode: "insensitive" as const } });
+      orConditions.push({
+        name: { contains: name, mode: "insensitive" as const },
+      });
     }
     if (email) {
-      orConditions.push({ email: { contains: email, mode: "insensitive" as const } });
+      orConditions.push({
+        email: { contains: email, mode: "insensitive" as const },
+      });
     }
 
     const where: Prisma.usersWhereInput = {
@@ -47,19 +51,19 @@ export class UserRepository {
     userId,
     email,
     status,
-}: {
+  }: {
     userId?: string;
     email?: string;
     status?: UserStatus;
-}): Promise<users | null> {
+  }): Promise<users | null> {
     return this.prismaService.users.findFirst({
-        where: {
-            id: userId,
-            email: email,
-            status: status,
-        },
+      where: {
+        id: userId,
+        email: email,
+        status: status,
+      },
     });
-}
+  }
 
   async updateUser({
     userId,

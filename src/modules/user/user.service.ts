@@ -8,6 +8,8 @@ import {
   GetUserResponseDto,
   GetUsersRequestDto,
   MyInfomationResDto,
+  UpdateMyProfileRequestDto,
+  UpdateUserByUserIdRequestDto,
 } from "./dtos";
 import { UserRepository } from "./user.repository";
 import { PaginationUtils } from "@/common/utils/pagination.utils";
@@ -16,7 +18,7 @@ import { CloudinaryService } from "@/common/service/cloudinary.service";
 export class UserServicer {
   constructor(
     private readonly userRepository = new UserRepository(),
-    private readonly cloudinaryService = new CloudinaryService()
+    private readonly cloudinaryService = new CloudinaryService(),
   ) {}
 
   async getUserByUserId(
@@ -84,7 +86,10 @@ export class UserServicer {
       throw new NotFoundException("userId");
     }
 
-    const updateAvatar = await this.cloudinaryService.uploadAvatar(file, userId);
+    const updateAvatar = await this.cloudinaryService.uploadAvatar(
+      file,
+      userId,
+    );
 
     const updatedUser = await this.userRepository.updateUser({
       userId,
@@ -96,6 +101,56 @@ export class UserServicer {
     return {
       success: true,
       data: { avatar: updatedUser.avatar },
+    };
+  }
+
+  async updateMyProfile(
+    userId: string,
+    dto: UpdateMyProfileRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<MyInfomationResDto>> {
+    const user = await this.userRepository.findUser({ userId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    const updatedUser = await this.userRepository.updateUser({
+      userId,
+      user: {
+        name: dto.name,
+        bio: dto.bio,
+        address: dto.address,
+        phone: dto.phone,
+      },
+    });
+
+    return {
+      success: true,
+      data: new MyInfomationResDto(updatedUser),
+    };
+  }
+
+  async updateUserByUserId(
+    targetUserId: string,
+    dto: UpdateUserByUserIdRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<MyInfomationResDto>> {
+    const user = await this.userRepository.findUser({ userId: targetUserId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    const updatedUser = await this.userRepository.updateUser({
+      userId: targetUserId,
+      user: {
+        name: dto.name,
+        bio: dto.bio,
+        address: dto.address,
+        phone: dto.phone,
+      },
+    });
+
+    return {
+      success: true,
+      data: new MyInfomationResDto(updatedUser),
     };
   }
 }

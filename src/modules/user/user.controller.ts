@@ -5,6 +5,8 @@ import {
   ChangePasswordRequestDto,
   GetUserByUserIdRequestDto,
   GetUsersRequestDto,
+  UpdateMyProfileRequestDto,
+  UpdateUserByUserIdRequestDto,
 } from "./dtos";
 import { UserServicer } from "./user.service";
 import { AuthService } from "../auth/auth.service";
@@ -94,6 +96,36 @@ export class UserController {
     const userId = (req as any).user.id;
     const dto = new ChangePasswordRequestDto(req.body);
     const result = await this.authService.changPassword(userId, dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async updateMyProfile(req: Request, res: Response): Promise<Response> {
+    const userId = (req as any).user?.id as string | undefined;
+    if (!userId) {
+      return new HttpResponseDto().exception(
+        res,
+        new Exception(401, "Unauthorized"),
+      );
+    }
+
+    const dto = new UpdateMyProfileRequestDto(req.body);
+    const result = await this.userService.updateMyProfile(userId, dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async updateUserByUserId(req: Request, res: Response): Promise<Response> {
+    const { userId } = req.params;
+    const dto = new UpdateUserByUserIdRequestDto(userId as string, req.body);
+    const result = await this.userService.updateUserByUserId(
+      userId as string,
+      dto,
+    );
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }

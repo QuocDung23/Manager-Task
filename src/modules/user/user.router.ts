@@ -13,7 +13,12 @@ import {
   getUsersRequestValidationSchema,
   changePasswordRequestSchema,
   changePasswordRequestValidationSchema,
+  updateMyProfileRequestSchema,
+  updateMyProfileRequestValidationSchema,
+  updateUserByUserIdRequestSchema,
+  updateUserByUserIdValidationSchema,
 } from "./dtos/request";
+import { UserPermissions } from "@/common/enums/permissions";
 import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
   changPasswordResponseSchema,
@@ -114,6 +119,35 @@ router.patch(
   authMiddleware.verifyAccessToken,
   validateRequestMiddleware(changePasswordRequestValidationSchema),
   userController.changePassword,
+);
+
+userRegistry.registerPath({
+  method: "patch",
+  path: "/user/me",
+  tags: ["User"],
+  request: updateMyProfileRequestSchema,
+  responses: createApiResponse(myInfomationResponseSchema, "Success", StatusCodes.OK),
+});
+router.patch(
+  "/me",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(updateMyProfileRequestValidationSchema),
+  userController.updateMyProfile,
+);
+
+userRegistry.registerPath({
+  method: "patch",
+  path: "/user/{userId}",
+  tags: ["User"],
+  request: updateUserByUserIdRequestSchema,
+  responses: createApiResponse(myInfomationResponseSchema, "Success", StatusCodes.OK),
+});
+router.patch(
+  "/:userId",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifySystemPermission(UserPermissions.UPDATE_USER),
+  validateRequestMiddleware(updateUserByUserIdValidationSchema),
+  userController.updateUserByUserId,
 );
 
 export const userRouter = router;
