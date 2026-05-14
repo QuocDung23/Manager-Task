@@ -262,6 +262,7 @@ export class AuthService {
     const isOtpValid = await this.otpService.verifyOtp({
       userId: user.userId,
       otp: dto.otp,
+      deleteOtpAfterVerify: false,
     });
     if (!isOtpValid) {
       throw new BadRequest("Invalid OTP");
