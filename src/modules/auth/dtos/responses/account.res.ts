@@ -11,6 +11,8 @@ export class AccountResDto {
   avatar: string | null;
   verify: boolean;
   status: UserStatus;
+  accessToken: string;
+  refreshToken: string;
 
   constructor(account: accountsWithPartialRelations) {
     this.id = account.id;
@@ -21,6 +23,8 @@ export class AccountResDto {
     this.avatar = account.user?.avatar || "";
     this.verify = account.user?.verify || false;
     this.status = account.user?.status || UserStatus.ACTIVE;
+    this.accessToken = "";
+    this.refreshToken = "";
 
     if (account.user) {
       this.name = account.user.name || "";

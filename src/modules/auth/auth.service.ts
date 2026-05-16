@@ -1,6 +1,7 @@
 import {
   ConflictException,
   HttpResponseBodySuccessDto,
+  InternalServerException,
   NotFoundException,
   OptionalException,
 } from "@/common";
@@ -87,16 +88,19 @@ export class AuthService {
     if (!account) {
       throw new NotFoundException("email not found");
     }
-    if (account.user?.status === UserStatus.PENDING) {
-      throw new OptionalException(
-        StatusCodes.UNAUTHORIZED,
-        "your account is not verified",
-      );
-    }
     if (account.user?.status === UserStatus.LOCKED) {
       throw new OptionalException(
         StatusCodes.FORBIDDEN,
         "your account has been locked",
+      );
+    }
+
+    if(account.user?.verify === false || account.user?.status === UserStatus.PENDING) {
+      this.sendOtp({ email: account.user?.email ?? "" }).catch(
+        (error) => {
+          throw new InternalServerException();
+     
+        }
       );
     }
 
@@ -106,6 +110,9 @@ export class AuthService {
     }
     const { accessToken, refreshToken } = await signJWT({
       userId: account.userId,
+      email: account.user?.email,
+      verify: account.user?.verify ?? false,
+      status: account.user?.status,
     });
 
     await this.authRepository.createToken({
@@ -122,8 +129,12 @@ export class AuthService {
     return {
       success: true,
       data: {
+        email: account.user?.email ?? loginRequestDto.email,
+        verify: account.user?.verify ?? false,
+        status: account.user?.status ?? UserStatus.PENDING,
         accessToken: accessToken,
         refreshToken: refreshToken,
+        
       },
       cookies: {
         accessToken: accessToken,
@@ -194,12 +205,36 @@ export class AuthService {
       },
     });
 
+    const {accessToken, refreshToken} = await signJWT({
+      userId: account.userId,
+      email: account.user?.email,
+      verify: true,
+      status: UserStatus.ACTIVE,
+    });
+
+    await this.authRepository.createToken({
+      token: {
+        refreshToken: refreshToken,
+        user: {
+          connect: {
+            id: account.userId,
+          },
+        },
+      },
+    });
+
     const accountRes = new AccountResDto(account);
     accountRes.verify = true;
+    accountRes.accessToken = accessToken;
+    accountRes.refreshToken = refreshToken;
 
     return {
       success: true,
       data: accountRes,
+      cookies: {
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      },
     };
   }
 
@@ -208,6 +243,9 @@ export class AuthService {
   ): Promise<HttpResponseBodySuccessDto<LoginResponseDto | Exception>> {
     const { accessToken, refreshToken } = await signJWT({
       userId: myInfomation.id,
+      email: myInfomation.email,
+      verify: myInfomation.verify ?? false,
+      status: myInfomation.status,
     });
 
     await this.authRepository.createToken({
@@ -221,12 +259,16 @@ export class AuthService {
       },
     });
 
+    const tokens = new LoginResponseDto();
+    tokens.accessToken = accessToken;
+    tokens.refreshToken = refreshToken;
+    tokens.email = myInfomation.email;
+    tokens.verify = myInfomation.verify;
+    tokens.status = myInfomation.status;
+
     return {
       success: true,
-      data: {
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-      },
+      data: tokens,
       cookies: {
         accessToken: accessToken,
         refreshToken: refreshToken,
