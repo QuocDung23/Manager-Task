@@ -27,7 +27,7 @@ export class AuthRepository {
           status: userStatus,
         },
       },
-    });
+    }) as unknown as accountsWithPartialRelations | null;
   }
 
   async createAccount({
@@ -40,7 +40,7 @@ export class AuthRepository {
         user: true,
       },
       data: accounts,
-    });
+    }) as unknown as accountsWithPartialRelations;
   }
 
   async addUserRole(userId: string, roleName: string): Promise<void> {
@@ -101,7 +101,7 @@ export class AuthRepository {
       where: {
         userId: userId,
       },
-    });
+    }) as unknown as accountsWithPartialRelations | null;
   }
 
   async updateAccountPassword(args: {
@@ -130,5 +130,66 @@ export class AuthRepository {
         deleteAt: new Date(),
       },
     });
+  }
+
+  async deleteExpiredPendingAccounts(cutoff: Date): Promise<number> {
+    const pendingUsers = await this.prismaService.users.findMany({
+      where: {
+        verify: false,
+        status: UserStatus.PENDING,
+        createdAt: {
+          lte: cutoff,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (pendingUsers.length === 0) {
+      return 0;
+    }
+
+    const userIds = pendingUsers.map((user) => user.id);
+
+    await this.prismaService.$transaction([
+      this.prismaService.userRoles.deleteMany({
+        where: {
+          userId: {
+            in: userIds,
+          },
+        },
+      }),
+      this.prismaService.tokens.deleteMany({
+        where: {
+          userId: {
+            in: userIds,
+          },
+        },
+      }),
+      this.prismaService.otps.deleteMany({
+        where: {
+          userId: {
+            in: userIds,
+          },
+        },
+      }),
+      this.prismaService.accounts.deleteMany({
+        where: {
+          userId: {
+            in: userIds,
+          },
+        },
+      }),
+      this.prismaService.users.deleteMany({
+        where: {
+          id: {
+            in: userIds,
+          },
+        },
+      }),
+    ]);
+
+    return userIds.length;
   }
 }

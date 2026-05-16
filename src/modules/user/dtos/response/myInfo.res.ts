@@ -1,6 +1,5 @@
 import { getCloudinaryDisplayImageUrl } from "@/common";
-import { users } from "@/models";
-import { UserStatus } from "@prisma/client";
+import { UserStatus, users } from "@prisma/client";
 import z from "zod";
 
 

@@ -57,6 +57,8 @@ export class AuthService {
         create: {
           name: registerDto.name,
           email: registerDto.email,
+          status: UserStatus.PENDING,
+          verify: false,
           avatar: defaultAvatar,
         },
       },
@@ -67,6 +69,8 @@ export class AuthService {
     });
 
     await this.authRepository.addUserRole(newAccount.userId, "USER");
+
+    await this.sendOtp({ email: registerDto.email });
 
     return {
       success: true,
@@ -82,6 +86,12 @@ export class AuthService {
     });
     if (!account) {
       throw new NotFoundException("email not found");
+    }
+    if (account.user?.status === UserStatus.PENDING) {
+      throw new OptionalException(
+        StatusCodes.UNAUTHORIZED,
+        "your account is not verified",
+      );
     }
     if (account.user?.status === UserStatus.LOCKED) {
       throw new OptionalException(
@@ -155,7 +165,7 @@ export class AuthService {
     const { email, otp } = vefiryRequestDto;
     const account = await this.authRepository.findAccount({
       email: email,
-      userStatus: UserStatus.ACTIVE,
+      userStatus: UserStatus.PENDING,
     });
     if (!account || !account.user) {
       throw new NotFoundException("not account");
@@ -180,6 +190,7 @@ export class AuthService {
       userId: account.userId,
       user: {
         verify: true,
+        status: UserStatus.ACTIVE,
       },
     });
 

@@ -1,6 +1,5 @@
-import { Prisma, UserStatus } from "@prisma/client";
+import { Prisma, UserStatus, users } from "@prisma/client";
 import { PrismaService } from "../data";
-import { users } from "@/models";
 
 export class UserRepository {
   constructor(private readonly prismaService = new PrismaService()) {}

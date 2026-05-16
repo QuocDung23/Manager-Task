@@ -36,6 +36,7 @@ generator zod {
 enum UserStatus {
   ACTIVE @map("active")
   LOCKED @map("locked")
+  PENDING @map("pending")
 }
 
 enum ProjectStatus {

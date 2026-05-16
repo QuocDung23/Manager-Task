@@ -8,6 +8,7 @@ import morgan from "morgan";
 import { openAPIRouter } from "./swagger";
 import { Modules } from "./modules";
 import { appEnv } from "./configs";
+import { startAccountCleanupCron } from "./common/service/accountCleanup-cron.service";
 
 const app: Express = express();
 
@@ -50,6 +51,8 @@ app.use("/list", Modules.listRouter);
 app.use("/task", Modules.taskRouter);
 
 app.use(openAPIRouter);
+
+startAccountCleanupCron();
 
 app.listen(appEnv.PORT, () => {
   const { NODE_ENV, HOST, PORT } = appEnv;
