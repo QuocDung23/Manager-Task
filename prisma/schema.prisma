@@ -295,18 +295,19 @@ model lists {
 }
 
 model tasks {
-  id          String     @id @default(uuid())
-  name        String
-  description String
-  orderTask   Int        @default(0)
-  dueDate     DateTime?  @map("due_date")
-  listId      String     @map("list_id")
-  list        lists      @relation(fields: [listId], references: [id])
-  status      TaskStatus @default(ACTIVE)
+  id           String           @id @default(uuid())
+  name         String
+  description  String
+  orderTask    Int              @default(0)
+  dueDate      DateTime?        @map("due_date")
+  listId       String           @map("list_id")
+  list         lists            @relation(fields: [listId], references: [id])
+  status       TaskStatus       @default(ACTIVE)
+  statusAction TaskStatusAction @default(TODO)
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt       @map("updated_at")
+  deletedAt DateTime?  @map("deleted_at")
 
   @@map("tasks")
 }

@@ -1,9 +1,4 @@
-import {
-  HttpResponseBodySuccessDto,
-  NotFoundException,
-  PaginationDto,
-  PaginationUtils,
-} from "@/common";
+import { HttpResponseBodySuccessDto, NotFoundException } from "@/common";
 import {
   CreateTaskRequestDto,
   GetAllTaskRequestDto,
@@ -14,7 +9,6 @@ import { TaskRepository } from "./task.repository";
 import { TaskResponseDto } from "./dtos/response";
 import { Exception } from "@tsed/exceptions";
 import { Prisma } from "@prisma/client";
-import { ListResponseDto } from "../lists/dtos";
 
 export class TaskService {
   constructor(private readonly taskRepository = new TaskRepository()) {}
@@ -37,20 +31,13 @@ export class TaskService {
 
   async getAllTasks(
     getAllTaskDto: GetAllTaskRequestDto,
-    paginationDto: PaginationDto,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto[]> | Exception> {
     const { listId, name, status } = getAllTaskDto;
-    const paginationUtils = new PaginationUtils().extractSkipTakeFromPagination(
-      paginationDto,
-    );
-    const { skip, take } = paginationUtils;
 
-    const [tasks, totalTask] = await this.taskRepository.getTasks({
+    const tasks = await this.taskRepository.getTasks({
       listId,
       name,
       status,
-      skip,
-      take,
     });
 
     const listResponse = tasks.map(
@@ -60,8 +47,6 @@ export class TaskService {
     return {
       success: true,
       data: listResponse,
-      pagination:
-        paginationUtils.convertPaginationResponseDtoFromTotalRecords(totalTask),
     };
   }
 

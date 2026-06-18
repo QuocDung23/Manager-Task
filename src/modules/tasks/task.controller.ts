@@ -7,7 +7,7 @@ import {
 } from "./dtos/request";
 import { TaskService } from "./task.service";
 import { Request, Response } from "express";
-import { HttpResponseDto, PaginationDto } from "@/common";
+import { HttpResponseDto } from "@/common";
 
 export class TaskController {
   constructor(private readonly taskService = new TaskService()) {}
@@ -31,8 +31,7 @@ export class TaskController {
       ...(req.query as any),
       listId,
     });
-    const pagination: PaginationDto = new PaginationDto(req.query);
-    const result = await this.taskService.getAllTasks(getAllTask, pagination);
+    const result = await this.taskService.getAllTasks(getAllTask);
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }

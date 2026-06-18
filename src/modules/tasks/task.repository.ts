@@ -6,12 +6,10 @@ export class TaskRepository {
 
   async getTasks(args: {
     listId: string;
-    status: TaskStatus;
-    name: string;
-    skip: number;
-    take: number;
-  }): Promise<[tasks[], number]> {
-    const { listId, status, name, skip, take } = args;
+    status?: TaskStatus;
+    name?: string;
+  }): Promise<tasks[]> {
+    const { listId, status, name } = args;
 
     const where: Prisma.tasksWhereInput = {
       listId,
@@ -19,24 +17,19 @@ export class TaskRepository {
     };
 
     if (status) {
-      where.status = status as any;
+      where.status = status;
     }
 
     if (name) {
       where.name = { contains: name, mode: "insensitive" };
     }
 
-    return this.prisma.$transaction([
-      this.prisma.tasks.findMany({
-        where,
-        skip,
-        take,
-        orderBy: {
-          orderTask: "asc",
-        },
-      }),
-      this.prisma.tasks.count({ where }),
-    ]);
+    return this.prisma.tasks.findMany({
+      where,
+      orderBy: {
+        orderTask: "asc",
+      },
+    });
   }
 
   async getTaskById(id: string): Promise<tasks | null> {

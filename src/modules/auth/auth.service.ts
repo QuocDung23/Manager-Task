@@ -1,7 +1,6 @@
 import {
   ConflictException,
   HttpResponseBodySuccessDto,
-  InternalServerException,
   NotFoundException,
   OptionalException,
 } from "@/common";
@@ -95,18 +94,13 @@ export class AuthService {
       );
     }
 
-    if(account.user?.verify === false || account.user?.status === UserStatus.PENDING) {
-      this.sendOtp({ email: account.user?.email ?? "" }).catch(
-        (error) => {
-          throw new InternalServerException();
-     
-        }
-      );
-    }
-
     const hashedPassword = await hash(loginRequestDto.password, account.salt);
     if (hashedPassword !== account.password) {
       throw new OptionalException(StatusCodes.UNAUTHORIZED, "invalid password");
+    }
+
+    if(account.user?.verify === false || account.user?.status === UserStatus.PENDING) {
+      await this.sendOtp({ email: account.user?.email ?? "" });
     }
     const { accessToken, refreshToken } = await signJWT({
       userId: account.userId,

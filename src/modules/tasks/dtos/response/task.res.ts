@@ -1,4 +1,4 @@
-import { TaskStatus } from "@prisma/client"
+import { TaskStatus, TaskStatusAction } from "@prisma/client"
 import z from "zod"
 
 export class TaskResponseDto {
@@ -10,6 +10,7 @@ export class TaskResponseDto {
     listId: string
     assign: string[]
     status: TaskStatus
+    statusAction: TaskStatusAction
 
     createdAt: Date
     updatedAt: Date
@@ -24,6 +25,7 @@ export class TaskResponseDto {
         this.listId = data.listId
         this.assign = data.assign || []
         this.status = data.status
+        this.statusAction = data.statusAction
 
         this.createdAt = data.createdAt
         this.updatedAt = data.updatedAt
@@ -39,6 +41,7 @@ export const taskResponseSchema = z.object({
     listId: z.string().uuid(),
     assign: z.array(z.string().uuid()),
     status: z.enum(TaskStatus),
+    statusAction: z.enum(TaskStatusAction),
 
     createdAt: z.date(),
     updatedAt: z.date(),

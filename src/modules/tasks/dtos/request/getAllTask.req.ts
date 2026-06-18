@@ -2,10 +2,12 @@ import { TaskStatus } from "@prisma/client"
 import { ZodValidationSchema } from "@/common"
 import { z } from "zod"
 
+const taskStatusValues = Object.values(TaskStatus) as [TaskStatus, ...TaskStatus[]]
+
 export class GetAllTaskRequestDto {
     listId: string
-    status: TaskStatus
-    name: string
+    status?: TaskStatus
+    name?: string
 
     constructor(data: GetAllTaskRequestDto) {
         this.listId = data.listId
@@ -16,7 +18,7 @@ export class GetAllTaskRequestDto {
 
 export const getAllTaskRequestQuery = z.object({
     name: z.string().optional(),
-    status: z.enum(TaskStatus).optional(),
+    status: z.enum(taskStatusValues).optional(),
 }).strict()
 
 export const getAllTaskRequestParamsSchema = z.object({

@@ -1,6 +1,22 @@
-import { projects, projectsPartialWithRelations } from "@/models";
+import { projects } from "@/models";
 import { Prisma, PrismaService } from "../data";
 import { ProjectMemberStatus, ProjectStatus } from "@prisma/client";
+
+type ProjectCreateResult = Prisma.projectsGetPayload<{
+  include: {
+    user: true;
+  };
+}>;
+
+type ProjectWithMembersResult = Prisma.projectsGetPayload<{
+  include: {
+    projectMembers: {
+      include: {
+        user: true;
+      };
+    };
+  };
+}>;
 
 export class ProjectsRepository {
   constructor(private readonly prismaService = new PrismaService()) {}
@@ -9,7 +25,7 @@ export class ProjectsRepository {
     project,
   }: {
     project: Prisma.projectsCreateInput;
-  }): Promise<projectsPartialWithRelations> {
+  }): Promise<ProjectCreateResult> {
     return this.prismaService.projects.create({
       include: {
         user: true,
@@ -30,7 +46,7 @@ export class ProjectsRepository {
     status?: ProjectStatus;
     skip: number;
     take: number;
-  }): Promise<[projects[], number]> {
+  }): Promise<[ProjectWithMembersResult[], number]> {
     const whereCondition: Prisma.projectsWhereInput = {
       status,
       deletedAt: { equals: null },
@@ -63,9 +79,23 @@ export class ProjectsRepository {
         where: whereCondition,
         skip,
         take,
+        include: {
+          projectMembers: {
+            where: {
+              status: ProjectMemberStatus.ACTIVE,
+              deletedAt: null,
+            },
+            include: {
+              user: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
         orderBy: {
-          createdAt: 'desc'
-        }
+          createdAt: "desc",
+        },
       }),
       this.prismaService.projects.count({
         where: whereCondition,
@@ -82,7 +112,7 @@ export class ProjectsRepository {
     name?: string;
     status?: ProjectStatus;
     userId?: string;
-  }): Promise<projects | null> {
+  }): Promise<ProjectWithMembersResult | null> {
     return this.prismaService.projects.findFirst({
       where: {
         id: id,
@@ -90,6 +120,20 @@ export class ProjectsRepository {
         status: status,
         userId: userId,
         deletedAt: { equals: null },
+      },
+      include: {
+        projectMembers: {
+          where: {
+            status: ProjectMemberStatus.ACTIVE,
+            deletedAt: null,
+          },
+          include: {
+            user: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
       },
     });
   }
