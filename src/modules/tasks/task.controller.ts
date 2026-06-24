@@ -3,6 +3,7 @@ import {
   CreateTaskRequestDto,
   GetAllTaskRequestDto,
   GetTaskByIdRequestDto,
+  MoveTaskRequestDto,
   updateTaskRequestDto,
 } from "./dtos/request";
 import { TaskService } from "./task.service";
@@ -69,5 +70,19 @@ export class TaskController {
       throw new HttpResponseDto().exception(res, result)
     }
     return new HttpResponseDto().success(res, result)
+  }
+
+  async moveTask(req: Request, res: Response): Promise<Response> {
+    const taskId = req.params.taskId as string;
+    const moveTaskDto = new MoveTaskRequestDto({
+      ...(req.body as any),
+      taskId,
+    } as MoveTaskRequestDto);
+
+    const result = await this.taskService.moveTask(moveTaskDto);
+    if (result instanceof Exception) {
+      throw new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
   }
 }

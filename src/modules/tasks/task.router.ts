@@ -11,10 +11,12 @@ import {
   getAllTaskRequestValidationSchema,
   getTaskByIdRequestSchema,
   getTaskByIdRequestValidationSchema,
+  moveTaskRequestSchema,
+  moveTaskRequestValidationSchema,
   updateTaskRequestSchema,
   updateTaskRequestValidationSchema,
 } from "./dtos/request";
-import { taskResponseSchema } from "./dtos/response";
+import { moveTaskResponseSchema, taskResponseSchema } from "./dtos/response";
 import authMiddleware from "@/common/middlewares/auth.middleware";
 import { ListPermissions, TaskPermissions } from "@/common/enums/permissions";
 export const taskRegistry = new OpenAPIRegistry();
@@ -54,6 +56,27 @@ router.get(
   validateRequestMiddleware(getAllTaskRequestValidationSchema),
   authMiddleware.verifyTaskPermission(TaskPermissions.VIEW_TASK),
   taskController.getAllTask,
+);
+
+// PATCH /task/:taskId/move
+// Lưu ý: route này được khai báo TRƯỚC route /:id để tránh Express match nhầm dynamic route.
+taskRegistry.registerPath({
+  method: "patch",
+  path: "/task/{taskId}/move",
+  tags: ["Tasks"],
+  request: moveTaskRequestSchema,
+  responses: createApiResponse(
+    moveTaskResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.patch(
+  "/:taskId/move",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(moveTaskRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(TaskPermissions.MOVE_TASK),
+  taskController.moveTask,
 );
 
 taskRegistry.registerPath({
