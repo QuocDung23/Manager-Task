@@ -5,6 +5,8 @@ import { autoBindUtil, validateRequestMiddleware } from "@/common";
 import { StatusCodes } from "http-status-codes";
 import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
+  assignTaskRequestSchema,
+  assignTaskRequestValidationSchema,
   createTaskRequestSchema,
   createTaskRequestValidationSchema,
   getAllTaskRequestSchema,
@@ -13,6 +15,8 @@ import {
   getTaskByIdRequestValidationSchema,
   moveTaskRequestSchema,
   moveTaskRequestValidationSchema,
+  unassignTaskRequestSchema,
+  unassignTaskRequestValidationSchema,
   updateTaskRequestSchema,
   updateTaskRequestValidationSchema,
 } from "./dtos/request";
@@ -77,6 +81,48 @@ router.patch(
   validateRequestMiddleware(moveTaskRequestValidationSchema),
   authMiddleware.verifyTaskPermission(TaskPermissions.MOVE_TASK),
   taskController.moveTask,
+);
+
+// PATCH /task/:taskId/assign
+// Replace toàn bộ assignee của task bằng `userIds`. Mọi userId phải là active board member.
+taskRegistry.registerPath({
+  method: "patch",
+  path: "/task/{taskId}/assign",
+  tags: ["Tasks"],
+  request: assignTaskRequestSchema,
+  responses: createApiResponse(
+    taskResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.patch(
+  "/:taskId/assign",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(assignTaskRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(TaskPermissions.ASSIGN_TASK),
+  taskController.assignTask,
+);
+
+// DELETE /task/:taskId/assign/:userId
+// Gỡ 1 member khỏi task. Trả 404 nếu assignment active không tồn tại.
+taskRegistry.registerPath({
+  method: "delete",
+  path: "/task/{taskId}/assign/{userId}",
+  tags: ["Tasks"],
+  request: unassignTaskRequestSchema,
+  responses: createApiResponse(
+    taskResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.delete(
+  "/:taskId/assign/:userId",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(unassignTaskRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(TaskPermissions.UNASSIGN_TASK),
+  taskController.unassignTask,
 );
 
 taskRegistry.registerPath({

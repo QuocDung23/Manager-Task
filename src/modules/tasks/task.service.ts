@@ -1,30 +1,62 @@
 import { BadRequest, Exception } from "@tsed/exceptions";
 import {
+  ForbiddenException,
   HttpResponseBodySuccessDto,
   NotFoundException,
+  OptionalException,
 } from "@/common";
+import { StatusCodes } from "http-status-codes";
 import {
+  AssignTaskRequestDto,
   CreateTaskRequestDto,
   GetAllTaskRequestDto,
   GetTaskByIdRequestDto,
   MoveTaskRequestDto,
+  UnassignTaskRequestDto,
   updateTaskRequestDto,
 } from "./dtos/request";
-import { TaskRepository } from "./task.repository";
-import {
-  MoveTaskResponseDto,
-  TaskResponseDto,
-} from "./dtos/response";
+
+import { MoveTaskResponseDto, TaskResponseDto } from "./dtos/response";
 import { Prisma, tasks } from "@prisma/client";
 import { ListRepository } from "@/modules/lists/list.repository";
+import { BoardMemberRepository } from "@/modules/boardMember/boardMember.repository";
+import { TaskWithAssignments, TaskRepository } from "./task.repository";
 
 const ORDER_STEP = 65536;
+
+// Re-export để giữ type liên quan ở gần service khi cần.
+export type { TaskWithAssignments };
 
 export class TaskService {
   constructor(
     private readonly taskRepository = new TaskRepository(),
     private readonly listRepository = new ListRepository(),
+    private readonly boardMemberRepository = new BoardMemberRepository(),
   ) {}
+
+  /**
+   * Mapper chuẩn hoá việc map Prisma task (có thể kèm `taskAssignments`)
+   * sang `TaskResponseDto`. Đảm bảo field `assign` luôn đúng với dữ liệu thật.
+   */
+  private toTaskResponse(task: TaskWithAssignments): TaskResponseDto {
+    return new TaskResponseDto(task as unknown as TaskResponseDto);
+  }
+
+  /**
+   * Resolve boardId chứa task thông qua chain: task -> list -> board.
+   * Dùng trong các flow cần kiểm tra boardMember (assign/unassign).
+   */
+  private async resolveBoardIdByTaskId(taskId: string): Promise<string> {
+    const task = await this.taskRepository.getTaskWithList(taskId);
+    if (!task) {
+      throw new NotFoundException("Task not found");
+    }
+    const list = task.list;
+    if (!list || list.deletedAt !== null) {
+      throw new NotFoundException("List not found");
+    }
+    return list.boardId;
+  }
 
   async createTask(
     createTaskDto: CreateTaskRequestDto,
@@ -58,8 +90,13 @@ export class TaskService {
       status,
     });
 
-    const listResponse = tasks.map(
-      (task) => new TaskResponseDto(task as TaskResponseDto),
+    // Query kèm assignments để field `assign` không bao giờ là `[]` sai.
+    const ids = tasks.map((t) => t.id);
+    const tasksWithAssignments =
+      await this.taskRepository.getTasksWithAssignmentsByIds(ids);
+
+    const listResponse = tasksWithAssignments.map((task) =>
+      this.toTaskResponse(task),
     );
 
     return {
@@ -68,16 +105,20 @@ export class TaskService {
     };
   }
 
-  async getTaskById(getTaskByIdDto: GetTaskByIdRequestDto): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
-    const task = await this.taskRepository.getTaskById(getTaskByIdDto.id)
-    if(!task) {
-      throw new NotFoundException('Task not found')
+  async getTaskById(
+    getTaskByIdDto: GetTaskByIdRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    const task = await this.taskRepository.getTaskByIdWithAssignments(
+      getTaskByIdDto.id,
+    );
+    if (!task) {
+      throw new NotFoundException("Task not found");
     }
 
     return {
       success: true,
-      data: new TaskResponseDto(task as TaskResponseDto)
-    }
+      data: this.toTaskResponse(task),
+    };
   }
 
   async updateTask(
@@ -97,23 +138,31 @@ export class TaskService {
       updateData,
     );
 
+    // Query lại kèm assignments để response trả đúng `assign`.
+    const taskWithAssignments =
+      await this.taskRepository.getTaskByIdWithAssignments(updateTask.id);
+
     return {
       success: true,
-      data: new TaskResponseDto(updateTask as TaskResponseDto),
+      data: taskWithAssignments
+        ? this.toTaskResponse(taskWithAssignments)
+        : this.toTaskResponse(updateTask as TaskWithAssignments),
     };
   }
 
-  async deleteTask(deleteTaskDto: GetTaskByIdRequestDto): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
-    const task = await this.taskRepository.getTaskById(deleteTaskDto.id)
-    if(!task) {
-      throw new NotFoundException('Task not found')
+  async deleteTask(
+    deleteTaskDto: GetTaskByIdRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    const task = await this.taskRepository.getTaskById(deleteTaskDto.id);
+    if (!task) {
+      throw new NotFoundException("Task not found");
     }
 
-    const deleteTask = await this.taskRepository.deleteTask(deleteTaskDto.id)
+    const deleteTask = await this.taskRepository.deleteTask(deleteTaskDto.id);
     return {
       success: true,
-      data: new TaskResponseDto(deleteTask as TaskResponseDto)
-    }
+      data: this.toTaskResponse(deleteTask as TaskWithAssignments),
+    };
   }
 
   /**
@@ -125,12 +174,7 @@ export class TaskService {
   async moveTask(
     moveTaskDto: MoveTaskRequestDto,
   ): Promise<HttpResponseBodySuccessDto<MoveTaskResponseDto> | Exception> {
-    const {
-      taskId,
-      sourceListId,
-      targetListId,
-      orderedTaskIds,
-    } = moveTaskDto;
+    const { taskId, sourceListId, targetListId, orderedTaskIds } = moveTaskDto;
 
     // 1. orderedTaskIds phải có dữ liệu và không được trùng id
     if (!orderedTaskIds || orderedTaskIds.length === 0) {
@@ -182,9 +226,8 @@ export class TaskService {
     const isSameList = sourceListId === targetListId;
 
     // 7. lấy toàn bộ active task của target list (kèm cả task đang move nếu cùng list)
-    const targetTasks = await this.taskRepository.getTasksByListId(
-      targetListId,
-    );
+    const targetTasks =
+      await this.taskRepository.getTasksByListId(targetListId);
     const targetActiveIds = new Set(targetTasks.map((t) => t.id));
 
     if (isSameList) {
@@ -234,7 +277,11 @@ export class TaskService {
     }
 
     // 9. tạo updates cho target list (theo index * step)
-    const targetUpdates: Array<{ id: string; listId?: string; orderTask: number }> = [];
+    const targetUpdates: Array<{
+      id: string;
+      listId?: string;
+      orderTask: number;
+    }> = [];
     uniqueIds.forEach((id, index) => {
       if (id === taskId) {
         targetUpdates.push({
@@ -253,9 +300,8 @@ export class TaskService {
     // 10. nếu move sang list khác, reorder lại source list còn lại để đóng khoảng trống
     const sourceUpdates: Array<{ id: string; orderTask: number }> = [];
     if (!isSameList) {
-      const sourceTasks = await this.taskRepository.getTasksByListId(
-        sourceListId,
-      );
+      const sourceTasks =
+        await this.taskRepository.getTasksByListId(sourceListId);
       const remainingSource = sourceTasks.filter((t) => t.id !== taskId);
       remainingSource.forEach((t, index) => {
         sourceUpdates.push({
@@ -271,16 +317,19 @@ export class TaskService {
       ...sourceUpdates,
     ]);
 
-    // 12. query lại source/target tasks sort theo orderTask ASC
-    const updatedTargetTasks: tasks[] = await this.taskRepository.getTasksByListId(
-      targetListId,
-    );
+    // 12. query lại source/target tasks sort theo orderTask ASC, kèm assignments
+    const targetIds = isSameList
+      ? uniqueIds
+      : Array.from(new Set([...uniqueIds]));
+    const sourceIds = isSameList ? [] : uniqueIds; // không cần thiết, dùng getTasksByListId bên dưới
 
-    let updatedSourceTasks: tasks[] = [];
+    const updatedTargetTasks =
+      await this.taskRepository.getTasksWithAssignmentsByListId(targetListId);
+
+    let updatedSourceTasks: TaskWithAssignments[] = [];
     if (!isSameList) {
-      updatedSourceTasks = await this.taskRepository.getTasksByListId(
-        sourceListId,
-      );
+      updatedSourceTasks =
+        await this.taskRepository.getTasksWithAssignmentsByListId(sourceListId);
     }
 
     // 13. lấy ra task vừa move (sau khi update) từ target list
@@ -291,19 +340,112 @@ export class TaskService {
       throw new NotFoundException(`Moved task not found (${taskId})`);
     }
 
+    // Suppress unused warnings for future-proof variables (kept for clarity).
+    void targetIds;
+    void sourceIds;
+
     const response = new MoveTaskResponseDto({
-      movedTask: new TaskResponseDto(movedTaskRecord as TaskResponseDto),
-      sourceTasks: updatedSourceTasks.map(
-        (t) => new TaskResponseDto(t as TaskResponseDto),
-      ),
-      targetTasks: updatedTargetTasks.map(
-        (t) => new TaskResponseDto(t as TaskResponseDto),
-      ),
+      movedTask: this.toTaskResponse(movedTaskRecord),
+      sourceTasks: updatedSourceTasks.map((t) => this.toTaskResponse(t)),
+      targetTasks: updatedTargetTasks.map((t) => this.toTaskResponse(t)),
     });
 
     return {
       success: true,
       data: response,
+    };
+  }
+
+  /**
+   * Assign (replace) danh sách member cho task.
+   * Rule nghiệp vụ:
+   *  - Mọi `userId` trong body phải là active board member của board chứa task.
+   *  - Kể cả actor là project/board admin cũng không được bypass rule này.
+   *  - Endpoint PATCH này là REPLACE-ALL: những user đang được assign mà không có
+   *    trong `userIds` sẽ bị unassign (soft delete).
+   */
+  async assignTask(
+    assignTaskDto: AssignTaskRequestDto,
+    actorUserId?: string,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    const { taskId, userIds } = assignTaskDto;
+
+    // dedupe ở tầng service (zod đã enforce, nhưng double-check defensive)
+    const uniqueUserIds = Array.from(new Set(userIds));
+    if (uniqueUserIds.length !== userIds.length) {
+      throw new BadRequest("userIds contains duplicates");
+    }
+
+    // 1. suy ra boardId từ task -> list
+    const boardId = await this.resolveBoardIdByTaskId(taskId);
+
+    // 2. kiểm tra tất cả userId đều là active board member của board đó
+    const members =
+      await this.boardMemberRepository.getActiveBoardMembersByUserIds(
+        boardId,
+        uniqueUserIds,
+      );
+
+    const memberUserIds = new Set(members.map((m) => m.userId));
+    const notMembers = uniqueUserIds.filter((u) => !memberUserIds.has(u));
+
+    if (notMembers.length > 0) {
+      throw new ForbiddenException(
+        `The following users are not active members of this board: ${notMembers.join(", ")}`,
+      );
+    }
+
+    // 3. replace assignments trong transaction
+    const updatedTask = await this.taskRepository.replaceTaskAssignments(
+      taskId,
+      uniqueUserIds,
+      actorUserId,
+    );
+    if (!updatedTask) {
+      throw new NotFoundException("Task not found");
+    }
+
+    return {
+      success: true,
+      data: this.toTaskResponse(updatedTask),
+    };
+  }
+
+  /**
+   * Unassign 1 member khỏi task.
+   * - Trả 404 nếu assignment active không tồn tại (để FE biết user đó không còn được assign).
+   */
+  async unassignTask(
+    unassignTaskDto: UnassignTaskRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    const { taskId, userId } = unassignTaskDto;
+
+    // đảm bảo task tồn tại (cũng giúp middleware phía trên không cần kiểm tra)
+    const task = await this.taskRepository.getTaskById(taskId);
+    if (!task) {
+      throw new NotFoundException("Task not found");
+    }
+
+    // kiểm tra assignment active
+    const existing = await this.taskRepository.getTaskAssignment(
+      taskId,
+      userId,
+    );
+    if (!existing || existing.deletedAt !== null) {
+      throw new NotFoundException("Task assignment not found");
+    }
+
+    const updatedTask = await this.taskRepository.removeTaskAssignment(
+      taskId,
+      userId,
+    );
+    if (!updatedTask) {
+      throw new NotFoundException("Task not found");
+    }
+
+    return {
+      success: true,
+      data: this.toTaskResponse(updatedTask),
     };
   }
 }

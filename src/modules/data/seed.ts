@@ -68,8 +68,14 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     BoardPermissions.VIEW_BOARD,
     BoardPermissions.CREATE_LIST,
 
-    ...Object.values(ListPermissions),
-    ...Object.values(TaskPermissions),
+    ListPermissions.CREAT_TASK,
+    ListPermissions.VIEW_LIST,
+    ListPermissions.UPDATE_LIST,
+
+    TaskPermissions.VIEW_TASK,
+    TaskPermissions.UPDATE_TASK,
+    TaskPermissions.MOVE_TASK,
+
   ]
 };
 

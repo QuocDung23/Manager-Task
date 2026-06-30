@@ -1,9 +1,11 @@
 import { Exception } from "@tsed/exceptions";
 import {
+  AssignTaskRequestDto,
   CreateTaskRequestDto,
   GetAllTaskRequestDto,
   GetTaskByIdRequestDto,
   MoveTaskRequestDto,
+  UnassignTaskRequestDto,
   updateTaskRequestDto,
 } from "./dtos/request";
 import { TaskService } from "./task.service";
@@ -80,6 +82,47 @@ export class TaskController {
     } as MoveTaskRequestDto);
 
     const result = await this.taskService.moveTask(moveTaskDto);
+    if (result instanceof Exception) {
+      throw new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  /**
+   * PATCH /task/:taskId/assign
+   * Replace toàn bộ assignee của task bằng `userIds`.
+   * Middleware verifyTaskPermission đã check quyền `ASSIGN_TASK` ở context board.
+   */
+  async assignTask(req: Request, res: Response): Promise<Response> {
+    const taskId = req.params.taskId as string;
+    const assignTaskDto = new AssignTaskRequestDto({
+      ...(req.body as any),
+      taskId,
+    } as AssignTaskRequestDto);
+
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
+
+    const result = await this.taskService.assignTask(assignTaskDto, actorUserId);
+    if (result instanceof Exception) {
+      throw new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  /**
+   * DELETE /task/:taskId/assign/:userId
+   * Gỡ 1 member khỏi task.
+   */
+  async unassignTask(req: Request, res: Response): Promise<Response> {
+    const taskId = req.params.taskId as string;
+    const userId = req.params.userId as string;
+    const unassignTaskDto = new UnassignTaskRequestDto({
+      taskId,
+      userId,
+    } as UnassignTaskRequestDto);
+
+    const result = await this.taskService.unassignTask(unassignTaskDto);
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
