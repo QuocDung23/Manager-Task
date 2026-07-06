@@ -1,1 +1,1 @@
-export * from "./task.res"
+export * from "./task.res";

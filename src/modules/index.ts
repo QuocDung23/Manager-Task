@@ -9,6 +9,10 @@ import { projectRegistry, projectRouter } from "./projects/projects.router";
 import { userRegistry, userRouter } from "./user/user.router";
 import { boardRouter } from "./board/board.router";
 import { taskRegistry, taskRouter } from "./tasks/task.router";
+import {
+  taskCommentRegistry,
+  taskCommentRouter,
+} from "./tasks/comment/comment.router";
 
 export const Registries = [
   healthCheckRegistry,
@@ -17,7 +21,8 @@ export const Registries = [
   projectRegistry,
   boardRegistry,
   listRegistry,
-  taskRegistry
+  taskRegistry,
+  taskCommentRegistry,
 ];
 
 export const Modules = {
@@ -27,5 +32,6 @@ export const Modules = {
   projectRouter,
   boardRouter,
   listRouter,
-  taskRouter
+  taskRouter,
+  taskCommentRouter,
 };

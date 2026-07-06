@@ -3,12 +3,14 @@ import "reflect-metadata";
 import cors, { CorsOptions } from "cors";
 import express, { Express } from "express";
 import helmet from "helmet";
+import http from "http";
 import morgan from "morgan";
 
 import { openAPIRouter } from "./swagger";
 import { Modules } from "./modules";
 import { appEnv } from "./configs";
 import { startAccountCleanupCron } from "./common/service/accountCleanup-cron.service";
+import { initSocketServer } from "./modules/realtime";
 
 const app: Express = express();
 
@@ -48,13 +50,16 @@ app.use("/user", Modules.userRouter);
 app.use("/project", Modules.projectRouter);
 app.use("/board", Modules.boardRouter);
 app.use("/list", Modules.listRouter);
-app.use("/task", Modules.taskRouter);
+app.use("/task", [Modules.taskRouter, Modules.taskCommentRouter]);
 
 app.use(openAPIRouter);
 
 startAccountCleanupCron();
 
-app.listen(appEnv.PORT, () => {
+const httpServer = http.createServer(app);
+initSocketServer(httpServer, corsOptions);
+
+httpServer.listen(appEnv.PORT, () => {
   const { NODE_ENV, HOST, PORT } = appEnv;
   console.log(
     `Server (${NODE_ENV}) running on port http://${HOST}:${PORT}/api`,

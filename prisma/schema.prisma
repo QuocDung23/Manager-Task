@@ -116,9 +116,11 @@ model users {
   boardMembers   boardMembers[]
   userRoles      userRoles[]
 
-  // Task assignments
   taskAssignments         taskAssignments[]
-  assignedTaskAssignments taskAssignments[]   @relation("TaskAssignedBy")
+  assignedTaskAssignments taskAssignments[] @relation("TaskAssignedBy")
+
+
+  taskComments taskComments[]
 
   @@map("users")
 }
@@ -314,18 +316,19 @@ model tasks {
   deletedAt DateTime? @map("deleted_at")
 
   taskAssignments taskAssignments[]
+  taskComments    taskComments[]
 
   @@map("tasks")
 }
 
 model taskAssignments {
-  id           String   @id @default(uuid())
-  taskId       String   @map("task_id")
-  task         tasks    @relation(fields: [taskId], references: [id])
-  userId       String   @map("user_id")
-  user         users    @relation(fields: [userId], references: [id])
-  assignedById String?  @map("assigned_by_id")
-  assignedBy   users?   @relation("TaskAssignedBy", fields: [assignedById], references: [id])
+  id           String  @id @default(uuid())
+  taskId       String  @map("task_id")
+  task         tasks   @relation(fields: [taskId], references: [id])
+  userId       String  @map("user_id")
+  user         users   @relation(fields: [userId], references: [id])
+  assignedById String? @map("assigned_by_id")
+  assignedBy   users?  @relation("TaskAssignedBy", fields: [assignedById], references: [id])
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -333,4 +336,25 @@ model taskAssignments {
 
   @@unique([taskId, userId])
   @@map("taskAssignments")
+}
+
+model taskComments {
+  id              String         @id @default(uuid())
+  taskId          String         @map("task_id")
+  task            tasks          @relation(fields: [taskId], references: [id])
+  userId          String         @map("user_id")
+  user            users          @relation(fields: [userId], references: [id])
+  parentCommentId String?        @map("parent_comment_id")
+  parentComment   taskComments?  @relation("TaskCommentReplies", fields: [parentCommentId], references: [id])
+  replies         taskComments[] @relation("TaskCommentReplies")
+  content         String
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([taskId, parentCommentId, deletedAt, createdAt])
+  @@index([parentCommentId, deletedAt, createdAt])
+  @@index([userId])
+  @@map("taskComments")
 }

@@ -15,7 +15,7 @@ const allPermissions = [
   ...Object.values(ProjectPermissions),
   ...Object.values(BoardPermissions),
   ...Object.values(ListPermissions),
-  ...Object.values(TaskPermissions)
+  ...Object.values(TaskPermissions),
 ];
 
 const rolePermissionMap: Record<string, readonly string[]> = {
@@ -26,10 +26,7 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     ...Object.values(ListPermissions),
     ...Object.values(TaskPermissions),
   ],
-  [UserRole.USER]: [
-    UserPermissions.CREATE_PROJECT,
-    UserPermissions.VIEW_USER
-  ],
+  [UserRole.USER]: [UserPermissions.CREATE_PROJECT, UserPermissions.VIEW_USER],
 
   [ProjectRole.PROJECT_ADMIN]: [
     ProjectPermissions.UPDATE_PROJECT,
@@ -75,8 +72,10 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     TaskPermissions.VIEW_TASK,
     TaskPermissions.UPDATE_TASK,
     TaskPermissions.MOVE_TASK,
-
-  ]
+    TaskPermissions.CREATE_TASK_COMMENT,
+    TaskPermissions.UPDATE_TASK_COMMENT,
+    TaskPermissions.DELETE_TASK_COMMENT,
+  ],
 };
 
 const ROLE_PERMISSIONS = Array.from(
@@ -103,7 +102,7 @@ async function main() {
   const allRoles = [
     ...Object.values(UserRole),
     ...Object.values(ProjectRole),
-    ...Object.values(BoardRole)
+    ...Object.values(BoardRole),
   ];
   for (const role of allRoles) {
     await prisma.roles.upsert({

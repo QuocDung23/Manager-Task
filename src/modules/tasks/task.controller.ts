@@ -13,7 +13,9 @@ import { Request, Response } from "express";
 import { HttpResponseDto } from "@/common";
 
 export class TaskController {
-  constructor(private readonly taskService = new TaskService()) {}
+  constructor(
+    private readonly taskService = new TaskService(),
+  ) {}
 
   async createTask(req: Request, res: Response): Promise<Response> {
     const listId = req.params.listId;

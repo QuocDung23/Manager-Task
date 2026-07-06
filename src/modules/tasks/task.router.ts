@@ -20,14 +20,19 @@ import {
   updateTaskRequestSchema,
   updateTaskRequestValidationSchema,
 } from "./dtos/request";
-import { moveTaskResponseSchema, taskResponseSchema } from "./dtos/response";
+import {
+  moveTaskResponseSchema,
+  taskResponseSchema,
+} from "./dtos/response";
 import authMiddleware from "@/common/middlewares/auth.middleware";
 import { ListPermissions, TaskPermissions } from "@/common/enums/permissions";
+
 export const taskRegistry = new OpenAPIRegistry();
 const taskController = new TaskController();
 const router = express.Router({ mergeParams: true });
 autoBindUtil(taskController);
 
+// POST /task/:listId/tasks - tạo task trong list
 taskRegistry.registerPath({
   method: "post",
   path: "/task/{listId}/tasks",
@@ -47,6 +52,7 @@ router.post(
   taskController.createTask,
 );
 
+// GET /task/:listId/tasks - danh sách task trong list
 taskRegistry.registerPath({
   method: "get",
   path: "/task/{listId}/tasks",
@@ -62,7 +68,7 @@ router.get(
   taskController.getAllTask,
 );
 
-// PATCH /task/:taskId/move
+// PATCH /task/:taskId/move - di chuyển task
 // Lưu ý: route này được khai báo TRƯỚC route /:id để tránh Express match nhầm dynamic route.
 taskRegistry.registerPath({
   method: "patch",
@@ -83,8 +89,7 @@ router.patch(
   taskController.moveTask,
 );
 
-// PATCH /task/:taskId/assign
-// Replace toàn bộ assignee của task bằng `userIds`. Mọi userId phải là active board member.
+// PATCH /task/:taskId/assign - replace toàn bộ assignee
 taskRegistry.registerPath({
   method: "patch",
   path: "/task/{taskId}/assign",
@@ -104,8 +109,7 @@ router.patch(
   taskController.assignTask,
 );
 
-// DELETE /task/:taskId/assign/:userId
-// Gỡ 1 member khỏi task. Trả 404 nếu assignment active không tồn tại.
+// DELETE /task/:taskId/assign/:userId - gỡ 1 assignee
 taskRegistry.registerPath({
   method: "delete",
   path: "/task/{taskId}/assign/{userId}",
@@ -125,6 +129,7 @@ router.delete(
   taskController.unassignTask,
 );
 
+// GET /task/:id - chi tiết task
 taskRegistry.registerPath({
   method: "get",
   path: "/task/{id}",
@@ -140,6 +145,7 @@ router.get(
   taskController.getTaskById,
 );
 
+// PUT /task/:id - cập nhật task
 taskRegistry.registerPath({
   method: "put",
   path: "/task/{id}",
@@ -155,6 +161,7 @@ router.put(
   taskController.updateTask,
 );
 
+// DELETE /task/:id - xoá task
 taskRegistry.registerPath({
   method: "delete",
   path: "/task/{id}",
