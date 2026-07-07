@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, TaskStatus, tasks } from "@prisma/client";
+import { Prisma, PrismaClient, tags, TaskStatus, tasks } from "@prisma/client";
 import { PrismaService } from "../data/prisma.client";
 
 type PrismaTx = Omit<
@@ -6,18 +6,54 @@ type PrismaTx = Omit<
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
-// Type dùng chung: task có include taskAssignments (chỉ record active).
-export type TaskWithAssignments = tasks & {
-  taskAssignments?: Array<{
-    id: string;
-    taskId: string;
-    userId: string;
-    assignedById: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    deletedAt: Date | null;
-  }>;
+type TaskAssignmentLite = {
+  id: string;
+  taskId: string;
+  userId: string;
+  assignedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
 };
+
+export type TaskTagLite = {
+  id: string;
+  taskId: string;
+  tagId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+  tag: tags;
+};
+
+// Type dùng chung: task có include assignment và tag active.
+export type TaskWithDetails = tasks & {
+  taskAssignments?: TaskAssignmentLite[];
+  taskTags?: TaskTagLite[];
+};
+
+// Backward compatible alias cho các service đang import tên cũ.
+export type TaskWithAssignments = TaskWithDetails;
+
+export const taskDetailsInclude = {
+  taskAssignments: {
+    where: { deletedAt: null },
+  },
+  taskTags: {
+    where: {
+      deletedAt: null,
+      tag: {
+        deletedAt: null,
+      },
+    },
+    include: {
+      tag: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  },
+} satisfies Prisma.tasksInclude;
 
 export class TaskRepository {
   constructor(private readonly prisma = new PrismaService()) {}
@@ -26,8 +62,10 @@ export class TaskRepository {
     listId: string;
     status?: TaskStatus;
     name?: string;
-  }): Promise<tasks[]> {
-    const { listId, status, name } = args;
+    tagIds?: string[];
+    tagMode?: "ANY" | "ALL";
+  }): Promise<TaskWithDetails[]> {
+    const { listId, status, name, tagIds, tagMode = "ANY" } = args;
 
     const where: Prisma.tasksWhereInput = {
       listId,
@@ -42,11 +80,39 @@ export class TaskRepository {
       where.name = { contains: name, mode: "insensitive" };
     }
 
+    const uniqueTagIds = tagIds ? Array.from(new Set(tagIds)) : [];
+    if (uniqueTagIds.length > 0) {
+      if (tagMode === "ALL") {
+        where.AND = uniqueTagIds.map((tagId) => ({
+          taskTags: {
+            some: {
+              tagId,
+              deletedAt: null,
+              tag: {
+                deletedAt: null,
+              },
+            },
+          },
+        }));
+      } else {
+        where.taskTags = {
+          some: {
+            tagId: { in: uniqueTagIds },
+            deletedAt: null,
+            tag: {
+              deletedAt: null,
+            },
+          },
+        };
+      }
+    }
+
     return this.prisma.tasks.findMany({
       where,
       orderBy: {
         orderTask: "asc",
       },
+      include: taskDetailsInclude,
     });
   }
 
@@ -66,31 +132,14 @@ export class TaskRepository {
   async getTaskByIdWithAssignments(
     id: string,
     tx?: PrismaTx,
-  ): Promise<
-    | (tasks & {
-        taskAssignments: Array<{
-          id: string;
-          taskId: string;
-          userId: string;
-          assignedById: string | null;
-          createdAt: Date;
-          updatedAt: Date;
-          deletedAt: Date | null;
-        }>;
-      })
-    | null
-  > {
+  ): Promise<TaskWithDetails | null> {
     const client = (tx ?? this.prisma) as PrismaClient;
     return client.tasks.findFirst({
       where: {
         id,
         deletedAt: null,
       },
-      include: {
-        taskAssignments: {
-          where: { deletedAt: null },
-        },
-      },
+      include: taskDetailsInclude,
     });
   }
 
@@ -173,7 +222,9 @@ export class TaskRepository {
    * Lấy task active trong 1 list, kèm quan hệ `taskAssignments` (chỉ record active).
    * Dùng cho response moveTask/getAllTasks để field `assign` luôn đúng.
    */
-  async getTasksWithAssignmentsByListId(listId: string): Promise<TaskWithAssignments[]> {
+  async getTasksWithAssignmentsByListId(
+    listId: string,
+  ): Promise<TaskWithDetails[]> {
     return this.prisma.tasks.findMany({
       where: {
         listId,
@@ -182,11 +233,7 @@ export class TaskRepository {
       orderBy: {
         orderTask: "asc",
       },
-      include: {
-        taskAssignments: {
-          where: { deletedAt: null },
-        },
-      },
+      include: taskDetailsInclude,
     });
   }
 
@@ -196,18 +243,14 @@ export class TaskRepository {
    */
   async getTasksWithAssignmentsByIds(
     taskIds: string[],
-  ): Promise<TaskWithAssignments[]> {
+  ): Promise<TaskWithDetails[]> {
     if (!taskIds || taskIds.length === 0) return [];
     return this.prisma.tasks.findMany({
       where: {
         id: { in: taskIds },
         deletedAt: null,
       },
-      include: {
-        taskAssignments: {
-          where: { deletedAt: null },
-        },
-      },
+      include: taskDetailsInclude,
     });
   }
 
@@ -259,20 +302,7 @@ export class TaskRepository {
     taskId: string,
     userIds: string[],
     assignedById?: string,
-  ): Promise<
-    | (tasks & {
-        taskAssignments: Array<{
-          id: string;
-          taskId: string;
-          userId: string;
-          assignedById: string | null;
-          createdAt: Date;
-          updatedAt: Date;
-          deletedAt: Date | null;
-        }>;
-      })
-    | null
-  > {
+  ): Promise<TaskWithDetails | null> {
     const uniqueUserIds = Array.from(new Set(userIds));
 
     return this.prisma.$transaction(async (tx) => {
@@ -327,11 +357,7 @@ export class TaskRepository {
           id: taskId,
           deletedAt: null,
         },
-        include: {
-          taskAssignments: {
-            where: { deletedAt: null },
-          },
-        },
+        include: taskDetailsInclude,
       });
     });
   }
@@ -363,20 +389,7 @@ export class TaskRepository {
   async removeTaskAssignment(
     taskId: string,
     userId: string,
-  ): Promise<
-    | (tasks & {
-        taskAssignments: Array<{
-          id: string;
-          taskId: string;
-          userId: string;
-          assignedById: string | null;
-          createdAt: Date;
-          updatedAt: Date;
-          deletedAt: Date | null;
-        }>;
-      })
-    | null
-  > {
+  ): Promise<TaskWithDetails | null> {
     return this.prisma.$transaction(async (tx) => {
       await tx.taskAssignments.updateMany({
         where: {
@@ -394,11 +407,7 @@ export class TaskRepository {
           id: taskId,
           deletedAt: null,
         },
-        include: {
-          taskAssignments: {
-            where: { deletedAt: null },
-          },
-        },
+        include: taskDetailsInclude,
       });
     });
   }

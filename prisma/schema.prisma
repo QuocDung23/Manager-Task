@@ -69,6 +69,11 @@ enum TaskStatusAction {
   CANCELLED   @map("cancelled")
 }
 
+enum TagStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
 enum ProjectMemberStatus {
   ACTIVE   @map("active")
   INACTIVE @map("inactive")
@@ -261,6 +266,7 @@ model boards {
 
   boardMembers boardMembers[]
   lists        lists[]
+  tags         tags[]
 
   @@map("boards")
 }
@@ -317,8 +323,47 @@ model tasks {
 
   taskAssignments taskAssignments[]
   taskComments    taskComments[]
+  taskTags        taskTags[]
 
   @@map("tasks")
+}
+
+model tags {
+  id             String    @id @default(uuid())
+  boardId        String    @map("board_id")
+  board          boards    @relation(fields: [boardId], references: [id])
+  name           String
+  nameNormalized String    @map("name_normalized")
+  color          String    @default("#64748b")
+  status         TagStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  taskTags taskTags[]
+
+  @@unique([boardId, nameNormalized])
+  @@index([boardId, deletedAt])
+  @@index([status])
+  @@map("tags")
+}
+
+model taskTags {
+  id     String @id @default(uuid())
+  taskId String @map("task_id")
+  task   tasks  @relation(fields: [taskId], references: [id])
+  tagId  String @map("tag_id")
+  tag    tags   @relation(fields: [tagId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([taskId, tagId])
+  @@index([taskId, deletedAt])
+  @@index([tagId, deletedAt])
+  @@map("taskTags")
 }
 
 model taskAssignments {

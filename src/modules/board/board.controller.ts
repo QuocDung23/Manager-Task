@@ -74,11 +74,11 @@ export class BoardController {
       ...req.body,
       userId: user.id,
       boardId,
-    }
+    };
 
     const updateBoardDto = new UpdateBoardRequestDto(payload);
     const result = await this.boardService.updateBoard(updateBoardDto);
-    if(result instanceof Exception) {
+    if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
     return new HttpResponseDto().success(res, result);
@@ -91,11 +91,11 @@ export class BoardController {
     const payload = {
       boardId,
       userId: user.id,
-    }
-    
+    };
+
     const deleteBoardDto = new DeleteBoardRequestDto(payload);
     const result = await this.boardService.deleteBoard(deleteBoardDto);
-    if(result instanceof Exception) {
+    if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
     return new HttpResponseDto().success(res, result);
@@ -118,6 +118,15 @@ export class BoardController {
       return new HttpResponseDto().exception(res, result);
     }
 
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async getBoardMembers(req: Request, res: Response): Promise<Response> {
+    const boardId = req.params.boardId as string;
+    const result = await this.boardService.getBoardMembers(boardId);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
     return new HttpResponseDto().success(res, result);
   }
 }

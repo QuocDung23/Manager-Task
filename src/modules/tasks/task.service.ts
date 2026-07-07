@@ -82,22 +82,17 @@ export class TaskService {
   async getAllTasks(
     getAllTaskDto: GetAllTaskRequestDto,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto[]> | Exception> {
-    const { listId, name, status } = getAllTaskDto;
+    const { listId, name, status, tagIds, tagMode } = getAllTaskDto;
 
     const tasks = await this.taskRepository.getTasks({
       listId,
       name,
       status,
+      tagIds,
+      tagMode,
     });
 
-    // Query kèm assignments để field `assign` không bao giờ là `[]` sai.
-    const ids = tasks.map((t) => t.id);
-    const tasksWithAssignments =
-      await this.taskRepository.getTasksWithAssignmentsByIds(ids);
-
-    const listResponse = tasksWithAssignments.map((task) =>
-      this.toTaskResponse(task),
-    );
+    const listResponse = tasks.map((task) => this.toTaskResponse(task));
 
     return {
       success: true,
@@ -356,14 +351,6 @@ export class TaskService {
     };
   }
 
-  /**
-   * Assign (replace) danh sách member cho task.
-   * Rule nghiệp vụ:
-   *  - Mọi `userId` trong body phải là active board member của board chứa task.
-   *  - Kể cả actor là project/board admin cũng không được bypass rule này.
-   *  - Endpoint PATCH này là REPLACE-ALL: những user đang được assign mà không có
-   *    trong `userIds` sẽ bị unassign (soft delete).
-   */
   async assignTask(
     assignTaskDto: AssignTaskRequestDto,
     actorUserId?: string,
@@ -411,10 +398,6 @@ export class TaskService {
     };
   }
 
-  /**
-   * Unassign 1 member khỏi task.
-   * - Trả 404 nếu assignment active không tồn tại (để FE biết user đó không còn được assign).
-   */
   async unassignTask(
     unassignTaskDto: UnassignTaskRequestDto,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {

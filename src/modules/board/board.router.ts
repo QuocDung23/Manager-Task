@@ -8,16 +8,40 @@ import {
 import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import { StatusCodes } from "http-status-codes";
 import { boardResponseSchema } from "./dtos/responses/board.res";
+import { boardMemberResponseSchema } from "./dtos/responses/boardMember.res";
 import authMiddleware from "@/common/middlewares/auth.middleware";
-import { BoardPermissions, ProjectPermissions } from "@/common/enums/permissions";
-import { getBoardByIdRequestValidationSchema, getBoardRequestSchema } from "./dtos/requests/getBoard.req";
+import {
+  BoardPermissions,
+  ProjectPermissions,
+} from "@/common/enums/permissions";
+import {
+  getBoardByIdRequestValidationSchema,
+  getBoardRequestSchema,
+} from "./dtos/requests/getBoard.req";
 import { BoardController } from "./board.controller";
-import { updateBoardRequestSchema, updateBoardRequestValidationSchema } from "./dtos/requests/updateBoard.req";
-import { deleteBoardRequestSchema, deleteBoardRequestValidationSchema } from "./dtos/requests/deleteBoard.req";
-import { addMemberBoardRequestSchema, addMemberBoardRequestValidationSchema } from "./dtos/requests/addMemberBoard.req";
+import {
+  updateBoardRequestSchema,
+  updateBoardRequestValidationSchema,
+} from "./dtos/requests/updateBoard.req";
+import {
+  deleteBoardRequestSchema,
+  deleteBoardRequestValidationSchema,
+} from "./dtos/requests/deleteBoard.req";
+import {
+  addMemberBoardRequestSchema,
+  addMemberBoardRequestValidationSchema,
+} from "./dtos/requests/addMemberBoard.req";
+import {
+  getBoardMembersRequestSchema,
+  getBoardMembersRequestValidationSchema,
+} from "./dtos/requests/getBoardMembers.req";
 import { ListController } from "../lists/list.controller";
-import { createListRequestSchema, createListRequestValidationSchema } from "../lists/dtos/requests/createList.req";
+import {
+  createListRequestSchema,
+  createListRequestValidationSchema,
+} from "../lists/dtos/requests/createList.req";
 import { listResponseSchema } from "../lists/dtos";
+import { z } from "zod";
 
 export const boardRegistry = new OpenAPIRegistry();
 const boardController = new BoardController();
@@ -64,7 +88,7 @@ boardRegistry.registerPath({
   responses: createApiResponse(boardResponseSchema, "Success", StatusCodes.OK),
 });
 router.put(
-  '/:boardId/update',
+  "/:boardId/update",
   authMiddleware.verifyAccessToken,
   authMiddleware.verifyBoardPermission(BoardPermissions.UPDATE_BOARD),
   validateRequestMiddleware(updateBoardRequestValidationSchema),
@@ -72,14 +96,14 @@ router.put(
 );
 
 boardRegistry.registerPath({
-  method: 'delete',
-  path: '/board/{boardId}/delete',
-  tags: ['Boards'],
+  method: "delete",
+  path: "/board/{boardId}/delete",
+  tags: ["Boards"],
   request: deleteBoardRequestSchema,
-  responses: createApiResponse(boardResponseSchema, 'Success', StatusCodes.OK),
+  responses: createApiResponse(boardResponseSchema, "Success", StatusCodes.OK),
 });
 router.delete(
-  '/:boardId/delete',
+  "/:boardId/delete",
   authMiddleware.verifyAccessToken,
   authMiddleware.verifyBoardPermission(BoardPermissions.DELETE_BOARD),
   validateRequestMiddleware(deleteBoardRequestValidationSchema),
@@ -101,12 +125,36 @@ router.post(
   boardController.addMemberToBoard,
 );
 
+// GET /board/:boardId/members - lấy active members của board (kèm user info).
+boardRegistry.registerPath({
+  method: "get",
+  path: "/board/{boardId}/members",
+  tags: ["Boards"],
+  request: getBoardMembersRequestSchema,
+  responses: createApiResponse(
+    z.array(boardMemberResponseSchema),
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.get(
+  "/:boardId/members",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyBoardPermission(BoardPermissions.VIEW_BOARD),
+  validateRequestMiddleware(getBoardMembersRequestValidationSchema),
+  boardController.getBoardMembers,
+);
+
 boardRegistry.registerPath({
   method: "post",
   path: "/board/{boardId}/create-lists",
   tags: ["Boards"],
   request: createListRequestSchema,
-  responses: createApiResponse(listResponseSchema, "Success", StatusCodes.CREATED),
+  responses: createApiResponse(
+    listResponseSchema,
+    "Success",
+    StatusCodes.CREATED,
+  ),
 });
 router.post(
   "/:boardId/create-lists",

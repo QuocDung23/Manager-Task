@@ -13,6 +13,7 @@ import {
   taskCommentRegistry,
   taskCommentRouter,
 } from "./tasks/comment/comment.router";
+import { taskTagRegistry, taskTagRouter } from "./tasks/tag/tag.router";
 
 export const Registries = [
   healthCheckRegistry,
@@ -23,6 +24,7 @@ export const Registries = [
   listRegistry,
   taskRegistry,
   taskCommentRegistry,
+  taskTagRegistry,
 ];
 
 export const Modules = {
@@ -34,4 +36,5 @@ export const Modules = {
   listRouter,
   taskRouter,
   taskCommentRouter,
+  taskTagRouter,
 };

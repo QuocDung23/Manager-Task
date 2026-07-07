@@ -14,7 +14,7 @@ export class BoardMemberRepository {
         userId,
         boardId,
         roleId,
-      }
+      },
     });
   }
 
@@ -25,7 +25,7 @@ export class BoardMemberRepository {
         userId,
         status: BoardMemberStatus.ACTIVE,
         deletedAt: null,
-      }
+      },
     });
     return !!member;
   }
@@ -53,5 +53,39 @@ export class BoardMemberRepository {
         deletedAt: null,
       },
     });
+  }
+
+  getActiveBoardMembersWithUser(
+    boardId: string,
+  ): Promise<
+    Array<
+      boardMembers & {
+        user: {
+          id: string;
+          name: string;
+          email: string;
+          avatar: string | null;
+        };
+      }
+    >
+  > {
+    return this.prisma.boardMembers.findMany({
+      where: {
+        boardId,
+        status: BoardMemberStatus.ACTIVE,
+        deletedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    }) as any;
   }
 }

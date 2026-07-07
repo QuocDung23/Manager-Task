@@ -2,6 +2,7 @@ import { Exception } from "@tsed/exceptions";
 import { BoardRepository } from "./board.repository";
 import { GetBoardRequestDto } from "./dtos/requests";
 import { BoardResponseDto } from "./dtos/responses";
+import { BoardMemberResponseDto } from "./dtos/responses/boardMember.res";
 import {
   ConflictException,
   ForbiddenException,
@@ -229,8 +230,10 @@ export class BoardService {
       throw new ForbiddenException();
     }
 
-    const isBoardMember =
-      await this.boardMemberRepository.checkMemberOfBoard(boardId, userId);
+    const isBoardMember = await this.boardMemberRepository.checkMemberOfBoard(
+      boardId,
+      userId,
+    );
     if (isBoardMember) {
       throw new ConflictException("User already a board member");
     }
@@ -251,6 +254,36 @@ export class BoardService {
     return {
       success: true,
       data: null,
+    };
+  }
+
+  async getBoardMembers(
+    boardId: string,
+  ): Promise<HttpResponseBodySuccessDto<BoardMemberResponseDto[]>> {
+    const existingBoard = await this.boardRepository.getBoardById({
+      id: boardId,
+    });
+    if (!existingBoard) {
+      throw new NotFoundException("Board not found");
+    }
+
+    const members =
+      await this.boardMemberRepository.getActiveBoardMembersWithUser(boardId);
+    const data = members.map(
+      (m) =>
+        new BoardMemberResponseDto({
+          id: m.id,
+          userId: m.userId,
+          boardId: m.boardId,
+          roleId: m.roleId,
+          status: m.status,
+          user: m.user,
+        }),
+    );
+
+    return {
+      success: true,
+      data,
     };
   }
 }

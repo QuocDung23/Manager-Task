@@ -50,7 +50,11 @@ app.use("/user", Modules.userRouter);
 app.use("/project", Modules.projectRouter);
 app.use("/board", Modules.boardRouter);
 app.use("/list", Modules.listRouter);
-app.use("/task", [Modules.taskRouter, Modules.taskCommentRouter]);
+app.use("/task", [
+  Modules.taskRouter,
+  Modules.taskCommentRouter,
+  Modules.taskTagRouter,
+]);
 
 app.use(openAPIRouter);
 
