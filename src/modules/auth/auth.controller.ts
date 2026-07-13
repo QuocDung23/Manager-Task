@@ -50,6 +50,7 @@ export class AuthController {
       res.cookie("refreshToken", result.data.refreshToken, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: "/",
       });
     }
 

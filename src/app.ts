@@ -10,6 +10,7 @@ import { openAPIRouter } from "./swagger";
 import { Modules } from "./modules";
 import { appEnv } from "./configs";
 import { startAccountCleanupCron } from "./common/service/accountCleanup-cron.service";
+import { startTaskScheduleCron } from "./common/service/taskSchedule-cron.service";
 import { initSocketServer } from "./modules/realtime";
 
 const app: Express = express();
@@ -59,6 +60,7 @@ app.use("/task", [
 app.use(openAPIRouter);
 
 startAccountCleanupCron();
+startTaskScheduleCron();
 
 const httpServer = http.createServer(app);
 initSocketServer(httpServer, corsOptions);

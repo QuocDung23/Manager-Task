@@ -6,6 +6,7 @@ import {
   InterServerEvents,
   ServerToClientEvents,
   SocketData,
+  userRoom,
 } from "./realtime.types";
 import { socketAuthMiddleware } from "./socket-auth.middleware";
 import { registerTaskCommentHandlers } from "./task-comment.socket";
@@ -59,6 +60,7 @@ export const initSocketServer = (
   io.use(socketAuthMiddleware());
 
   io.on("connection", (socket) => {
+    socket.join(userRoom(socket.data.user.id));
     registerTaskCommentHandlers(io, socket);
   });
 

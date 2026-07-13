@@ -1,5 +1,12 @@
 import { CommentResponseDto } from "@/modules/tasks/comment/dtos/response";
-import { taskRoom } from "./realtime.types";
+import { TaskResponseDto } from "@/modules/tasks/dtos/response";
+import {
+  taskRoom,
+  TaskDueSoonPayload,
+  TaskOverdueLockedPayload,
+  UserNotificationPayload,
+  userRoom,
+} from "./realtime.types";
 import { Server } from "socket.io";
 
 /**
@@ -17,6 +24,11 @@ export class RealtimeEventService {
   private emitToRoom(taskId: string, event: string, payload: any) {
     if (!this.io) return;
     this.io.to(taskRoom(taskId)).emit(event, payload);
+  }
+
+  private emitToUser(userId: string, event: string, payload: unknown) {
+    if (!this.io) return;
+    this.io.to(userRoom(userId)).emit(event, payload as any);
   }
 
   emitTaskCommentCreated(taskId: string, comment: CommentResponseDto) {
@@ -77,6 +89,30 @@ export class RealtimeEventService {
       replyId,
       reply,
     });
+  }
+
+  emitTaskScheduleUpdated(taskId: string, task: TaskResponseDto) {
+    this.emitToRoom(taskId, "task:schedule_updated", { taskId, task });
+  }
+
+  emitTaskRescheduled(taskId: string, task: TaskResponseDto) {
+    this.emitToRoom(taskId, "task:rescheduled", { taskId, task });
+  }
+
+  emitTaskUnlocked(taskId: string, task: TaskResponseDto) {
+    this.emitToRoom(taskId, "task:unlocked", { taskId, task });
+  }
+
+  emitTaskDueSoon(taskId: string, payload: TaskDueSoonPayload) {
+    this.emitToRoom(taskId, "task:due_soon", payload);
+  }
+
+  emitTaskOverdueLocked(taskId: string, payload: TaskOverdueLockedPayload) {
+    this.emitToRoom(taskId, "task:overdue_locked", payload);
+  }
+
+  emitUserNotification(userId: string, notification: UserNotificationPayload) {
+    this.emitToUser(userId, "notification:new", notification);
   }
 }
 

@@ -1,11 +1,14 @@
 import { Exception } from "@tsed/exceptions";
 import {
   AssignTaskRequestDto,
+  ClearTaskScheduleRequestDto,
   CreateTaskRequestDto,
   GetAllTaskRequestDto,
   GetTaskByIdRequestDto,
   MoveTaskRequestDto,
+  SetTaskScheduleRequestDto,
   UnassignTaskRequestDto,
+  UnlockTaskRequestDto,
   updateTaskRequestDto,
   UpdateTaskStatusActionRequestDto,
 } from "./dtos/request";
@@ -20,11 +23,13 @@ export class TaskController {
 
   async createTask(req: Request, res: Response): Promise<Response> {
     const listId = req.params.listId;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
     const payload = {
       ...req.body,
       listId,
     } as CreateTaskRequestDto;
-    const result = await this.taskService.createTask(payload);
+    const result = await this.taskService.createTask(payload, actorUserId);
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
@@ -126,6 +131,54 @@ export class TaskController {
     } as UnassignTaskRequestDto);
 
     const result = await this.taskService.unassignTask(unassignTaskDto);
+    if (result instanceof Exception) {
+      throw new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async setTaskSchedule(req: Request, res: Response): Promise<Response> {
+    const taskId = req.params.taskId as string;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
+    const dto = new SetTaskScheduleRequestDto({
+      ...(req.body as any),
+      taskId,
+    } as SetTaskScheduleRequestDto);
+
+    const result = await this.taskService.setTaskSchedule(dto, actorUserId);
+    if (result instanceof Exception) {
+      throw new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async clearTaskSchedule(req: Request, res: Response): Promise<Response> {
+    const taskId = req.params.taskId as string;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
+    const dto = new ClearTaskScheduleRequestDto({
+      ...(req.body as any),
+      taskId,
+    } as ClearTaskScheduleRequestDto);
+
+    const result = await this.taskService.clearTaskSchedule(dto, actorUserId);
+    if (result instanceof Exception) {
+      throw new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async unlockTask(req: Request, res: Response): Promise<Response> {
+    const taskId = req.params.taskId as string;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
+    const dto = new UnlockTaskRequestDto({
+      ...(req.body as any),
+      taskId,
+    } as UnlockTaskRequestDto);
+
+    const result = await this.taskService.unlockTask(dto, actorUserId);
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }

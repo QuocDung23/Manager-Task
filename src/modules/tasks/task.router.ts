@@ -7,6 +7,8 @@ import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
   assignTaskRequestSchema,
   assignTaskRequestValidationSchema,
+  clearTaskScheduleRequestSchema,
+  clearTaskScheduleRequestValidationSchema,
   createTaskRequestSchema,
   createTaskRequestValidationSchema,
   getAllTaskRequestSchema,
@@ -15,8 +17,12 @@ import {
   getTaskByIdRequestValidationSchema,
   moveTaskRequestSchema,
   moveTaskRequestValidationSchema,
+  setTaskScheduleRequestSchema,
+  setTaskScheduleRequestValidationSchema,
   unassignTaskRequestSchema,
   unassignTaskRequestValidationSchema,
+  unlockTaskRequestSchema,
+  unlockTaskRequestValidationSchema,
   updateTaskRequestSchema,
   updateTaskRequestValidationSchema,
   updateTaskStatusActionRequestSchema,
@@ -68,6 +74,70 @@ router.get(
   validateRequestMiddleware(getAllTaskRequestValidationSchema),
   authMiddleware.verifyTaskPermission(TaskPermissions.VIEW_TASK),
   taskController.getAllTask,
+);
+
+// PATCH /task/:taskId/schedule - đặt lịch hoặc reschedule task
+taskRegistry.registerPath({
+  method: "patch",
+  path: "/task/{taskId}/schedule",
+  tags: ["Tasks"],
+  request: setTaskScheduleRequestSchema,
+  responses: createApiResponse(taskResponseSchema, "Success", StatusCodes.OK),
+});
+router.patch(
+  "/:taskId/schedule",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(setTaskScheduleRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(TaskPermissions.SCHEDULE_TASK),
+  taskController.setTaskSchedule,
+);
+
+// DELETE /task/:taskId/schedule - xoá schedule task
+taskRegistry.registerPath({
+  method: "delete",
+  path: "/task/{taskId}/schedule",
+  tags: ["Tasks"],
+  request: clearTaskScheduleRequestSchema,
+  responses: createApiResponse(taskResponseSchema, "Success", StatusCodes.OK),
+});
+router.delete(
+  "/:taskId/schedule",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(clearTaskScheduleRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(TaskPermissions.CLEAR_TASK_SCHEDULE),
+  taskController.clearTaskSchedule,
+);
+
+// PATCH /task/:taskId/reschedule - alias rõ intent cho FE
+taskRegistry.registerPath({
+  method: "patch",
+  path: "/task/{taskId}/reschedule",
+  tags: ["Tasks"],
+  request: setTaskScheduleRequestSchema,
+  responses: createApiResponse(taskResponseSchema, "Success", StatusCodes.OK),
+});
+router.patch(
+  "/:taskId/reschedule",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(setTaskScheduleRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(TaskPermissions.RESCHEDULE_TASK),
+  taskController.setTaskSchedule,
+);
+
+// PATCH /task/:taskId/unlock - mở khoá thủ công
+taskRegistry.registerPath({
+  method: "patch",
+  path: "/task/{taskId}/unlock",
+  tags: ["Tasks"],
+  request: unlockTaskRequestSchema,
+  responses: createApiResponse(taskResponseSchema, "Success", StatusCodes.OK),
+});
+router.patch(
+  "/:taskId/unlock",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(unlockTaskRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(TaskPermissions.UNLOCK_TASK),
+  taskController.unlockTask,
 );
 
 // PATCH /task/:taskId/move - di chuyển task

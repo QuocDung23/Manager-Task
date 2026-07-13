@@ -8,22 +8,40 @@ import {
 import { StatusCodes } from "http-status-codes";
 import {
   AssignTaskRequestDto,
+  ClearTaskScheduleRequestDto,
   CreateTaskRequestDto,
   GetAllTaskRequestDto,
   GetTaskByIdRequestDto,
   MoveTaskRequestDto,
+  SetTaskScheduleRequestDto,
   UnassignTaskRequestDto,
+  UnlockTaskRequestDto,
   updateTaskRequestDto,
   UpdateTaskStatusActionRequestDto,
 } from "./dtos/request";
 
 import { MoveTaskResponseDto, TaskResponseDto } from "./dtos/response";
-import { Prisma, tasks } from "@prisma/client";
+import {
+  Prisma,
+  TaskLockStatus,
+  TaskScheduleEventType,
+  TaskStatusAction,
+  tasks,
+} from "@prisma/client";
 import { ListRepository } from "@/modules/lists/list.repository";
 import { BoardMemberRepository } from "@/modules/boardMember/boardMember.repository";
 import { TaskWithAssignments, TaskRepository } from "./task.repository";
+import { taskScheduleConfig } from "@/configs";
+import { realtimeEventService } from "@/modules/realtime";
 
 const ORDER_STEP = 65536;
+
+type TaskNotificationType =
+  | "TASK_DUE_SOON"
+  | "TASK_OVERDUE_LOCKED"
+  | "TASK_RESCHEDULED"
+  | "TASK_SCHEDULE_UPDATED"
+  | "TASK_UNLOCKED";
 
 // Re-export để giữ type liên quan ở gần service khi cần.
 export type { TaskWithAssignments };
@@ -41,6 +59,75 @@ export class TaskService {
    */
   private toTaskResponse(task: TaskWithAssignments): TaskResponseDto {
     return new TaskResponseDto(task as unknown as TaskResponseDto);
+  }
+
+  private async getActiveTaskOrThrow(taskId: string): Promise<tasks> {
+    const task = await this.taskRepository.getTaskById(taskId);
+    if (!task) {
+      throw new NotFoundException("Task not found");
+    }
+    return task;
+  }
+
+  private isTerminalAction(statusAction: TaskStatusAction): boolean {
+    return (
+      statusAction === TaskStatusAction.DONE ||
+      statusAction === TaskStatusAction.CANCELLED
+    );
+  }
+
+  private assertValidSchedule(dueDate: Date, reminderAt?: Date | null): void {
+    const now = new Date();
+    if (Number.isNaN(dueDate.getTime())) {
+      throw new BadRequest("dueDate is invalid");
+    }
+    if (dueDate.getTime() <= now.getTime()) {
+      throw new BadRequest("dueDate must be in the future");
+    }
+    if (reminderAt) {
+      if (Number.isNaN(reminderAt.getTime())) {
+        throw new BadRequest("reminderAt is invalid");
+      }
+      if (reminderAt.getTime() <= now.getTime()) {
+        throw new BadRequest("reminderAt must be in the future");
+      }
+      if (reminderAt.getTime() >= dueDate.getTime()) {
+        throw new BadRequest("reminderAt must be before dueDate");
+      }
+    }
+  }
+
+  private assertTaskNotLocked(task: Pick<tasks, "lockStatus">, action: string) {
+    if (task.lockStatus === TaskLockStatus.OVERDUE_LOCKED) {
+      throw new ForbiddenException(
+        `Task is locked because it is overdue. Please reschedule before ${action}.`,
+      );
+    }
+  }
+
+  private async notifyTaskRecipients(args: {
+    taskId: string;
+    type: TaskNotificationType;
+    title: string;
+    body: string;
+    data?: Record<string, unknown>;
+  }): Promise<string[]> {
+    const recipientIds = await this.taskRepository.getTaskNotificationRecipients(
+      args.taskId,
+    );
+    const payload = {
+      type: args.type,
+      title: args.title,
+      body: args.body,
+      data: args.data ?? {},
+      createdAt: new Date(),
+    };
+
+    recipientIds.forEach((userId) => {
+      realtimeEventService.emitUserNotification(userId, payload);
+    });
+
+    return recipientIds;
   }
 
   /**
@@ -61,7 +148,15 @@ export class TaskService {
 
   async createTask(
     createTaskDto: CreateTaskRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    if (createTaskDto.reminderAt && !createTaskDto.dueDate) {
+      throw new BadRequest("reminderAt requires dueDate");
+    }
+    if (createTaskDto.dueDate) {
+      this.assertValidSchedule(createTaskDto.dueDate, createTaskDto.reminderAt);
+    }
+
     // chọn 65536 vì nó = 2^16 đủ lớn để có thể drag drop ổn định
     const orderTask =
       (await this.taskRepository.getMaxOrderTask(createTaskDto.listId)) + 65536;
@@ -70,20 +165,54 @@ export class TaskService {
       name: createTaskDto.name,
       description: createTaskDto.description ?? "",
       orderTask,
+      dueDate: createTaskDto.dueDate,
+      reminderAt: createTaskDto.reminderAt ?? null,
       list: { connect: { id: createTaskDto.listId } },
     };
-    const createTask = await this.taskRepository.createTask(data);
+    const createTask = await this.taskRepository.createTask(
+      data,
+      createTaskDto.dueDate
+        ? {
+            actorId: actorUserId,
+            newDueDate: createTaskDto.dueDate,
+            metadata: {
+              reminderAt: createTaskDto.reminderAt?.toISOString() ?? null,
+            },
+          }
+        : undefined,
+    );
+
+    const taskWithAssignments =
+      await this.taskRepository.getTaskByIdWithAssignments(createTask.id);
+    const response = taskWithAssignments
+      ? this.toTaskResponse(taskWithAssignments)
+      : this.toTaskResponse(createTask as TaskWithAssignments);
+
+    if (createTaskDto.dueDate) {
+      realtimeEventService.emitTaskScheduleUpdated(createTask.id, response);
+    }
 
     return {
       success: true,
-      data: new TaskResponseDto(createTask as TaskResponseDto),
+      data: response,
     };
   }
 
   async getAllTasks(
     getAllTaskDto: GetAllTaskRequestDto,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto[]> | Exception> {
-    const { listId, name, status, tagIds, tagMode } = getAllTaskDto;
+    const {
+      listId,
+      name,
+      status,
+      tagIds,
+      tagMode,
+      dueBefore,
+      dueAfter,
+      scheduleState,
+      lockStatus,
+    } = getAllTaskDto;
+    const now = new Date();
 
     const tasks = await this.taskRepository.getTasks({
       listId,
@@ -91,6 +220,14 @@ export class TaskService {
       status,
       tagIds,
       tagMode,
+      dueBefore,
+      dueAfter,
+      scheduleState,
+      lockStatus,
+      now,
+      dueSoonBefore: new Date(
+        now.getTime() + taskScheduleConfig.reminderBeforeMinutes * 60 * 1000,
+      ),
     });
 
     const listResponse = tasks.map((task) => this.toTaskResponse(task));
@@ -124,6 +261,7 @@ export class TaskService {
     if (!task) {
       throw new NotFoundException("Task not found");
     }
+    this.assertTaskNotLocked(task, "updating it");
 
     const updateData: Prisma.tasksUpdateInput = {
       name: updateTaskDto.name,
@@ -193,6 +331,7 @@ export class TaskService {
     if (!task) {
       throw new NotFoundException(`Task not found (${taskId})`);
     }
+    this.assertTaskNotLocked(task, "moving it");
 
     // 4. task phải đang thuộc sourceListId (chống move task nhưng gửi sai source)
     if (task.listId !== sourceListId) {
@@ -364,6 +503,9 @@ export class TaskService {
       throw new BadRequest("userIds contains duplicates");
     }
 
+    const task = await this.getActiveTaskOrThrow(taskId);
+    this.assertTaskNotLocked(task, "assigning members");
+
     // 1. suy ra boardId từ task -> list
     const boardId = await this.resolveBoardIdByTaskId(taskId);
 
@@ -409,6 +551,7 @@ export class TaskService {
     if (!task) {
       throw new NotFoundException("Task not found");
     }
+    this.assertTaskNotLocked(task, "unassigning members");
 
     // kiểm tra assignment active
     const existing = await this.taskRepository.getTaskAssignment(
@@ -433,6 +576,238 @@ export class TaskService {
     };
   }
 
+  async setTaskSchedule(
+    dto: SetTaskScheduleRequestDto,
+    actorUserId?: string,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    const task = await this.getActiveTaskOrThrow(dto.taskId);
+    if (this.isTerminalAction(task.statusAction)) {
+      throw new BadRequest("Cannot schedule a completed or cancelled task");
+    }
+
+    const reason = dto.reason?.trim();
+    this.assertValidSchedule(dto.dueDate, dto.reminderAt);
+
+    const isLocked = task.lockStatus !== TaskLockStatus.UNLOCKED;
+    if (isLocked && !reason) {
+      throw new BadRequest("reason is required when rescheduling a locked task");
+    }
+
+    const eventType =
+      task.dueDate || isLocked
+        ? TaskScheduleEventType.RESCHEDULED
+        : TaskScheduleEventType.SCHEDULED;
+
+    const updatedTask = await this.taskRepository.updateTaskSchedule({
+      taskId: dto.taskId,
+      dueDate: dto.dueDate,
+      reminderAt: dto.reminderAt ?? null,
+      actorId: actorUserId,
+      reason,
+      eventType,
+      oldDueDate: task.dueDate,
+      incrementRescheduleCount: eventType === TaskScheduleEventType.RESCHEDULED,
+    });
+    if (!updatedTask) {
+      throw new NotFoundException("Task not found");
+    }
+
+    const response = this.toTaskResponse(updatedTask);
+    if (eventType === TaskScheduleEventType.RESCHEDULED) {
+      realtimeEventService.emitTaskRescheduled(dto.taskId, response);
+      await this.notifyTaskRecipients({
+        taskId: dto.taskId,
+        type: "TASK_RESCHEDULED",
+        title: "Task đã được đổi lịch",
+        body: `Task "${response.name}" đã được đổi deadline.`,
+        data: {
+          taskId: dto.taskId,
+          dueDate: dto.dueDate.toISOString(),
+          reminderAt: dto.reminderAt?.toISOString() ?? null,
+        },
+      });
+    } else {
+      realtimeEventService.emitTaskScheduleUpdated(dto.taskId, response);
+      await this.notifyTaskRecipients({
+        taskId: dto.taskId,
+        type: "TASK_SCHEDULE_UPDATED",
+        title: "Task đã được đặt lịch",
+        body: `Task "${response.name}" đã có deadline mới.`,
+        data: {
+          taskId: dto.taskId,
+          dueDate: dto.dueDate.toISOString(),
+          reminderAt: dto.reminderAt?.toISOString() ?? null,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      data: response,
+    };
+  }
+
+  async clearTaskSchedule(
+    dto: ClearTaskScheduleRequestDto,
+    actorUserId?: string,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    const task = await this.getActiveTaskOrThrow(dto.taskId);
+    if (task.lockStatus === TaskLockStatus.OVERDUE_LOCKED) {
+      throw new ForbiddenException(
+        "Task is locked because it is overdue. Please reschedule before clearing schedule.",
+      );
+    }
+
+    const updatedTask = await this.taskRepository.clearTaskSchedule({
+      taskId: dto.taskId,
+      actorId: actorUserId,
+      reason: dto.reason?.trim(),
+      oldDueDate: task.dueDate,
+    });
+    if (!updatedTask) {
+      throw new NotFoundException("Task not found");
+    }
+
+    const response = this.toTaskResponse(updatedTask);
+    realtimeEventService.emitTaskScheduleUpdated(dto.taskId, response);
+
+    return {
+      success: true,
+      data: response,
+    };
+  }
+
+  async unlockTask(
+    dto: UnlockTaskRequestDto,
+    actorUserId?: string,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    const task = await this.getActiveTaskOrThrow(dto.taskId);
+    if (task.lockStatus === TaskLockStatus.UNLOCKED) {
+      const taskWithAssignments =
+        await this.taskRepository.getTaskByIdWithAssignments(dto.taskId);
+      return {
+        success: true,
+        data: this.toTaskResponse(
+          (taskWithAssignments ?? task) as TaskWithAssignments,
+        ),
+      };
+    }
+
+    const updatedTask = await this.taskRepository.unlockTask({
+      taskId: dto.taskId,
+      actorId: actorUserId,
+      reason: dto.reason.trim(),
+      oldDueDate: task.dueDate,
+    });
+    if (!updatedTask) {
+      throw new NotFoundException("Task not found");
+    }
+
+    const response = this.toTaskResponse(updatedTask);
+    realtimeEventService.emitTaskUnlocked(dto.taskId, response);
+    await this.notifyTaskRecipients({
+      taskId: dto.taskId,
+      type: "TASK_UNLOCKED",
+      title: "Task đã được mở khoá",
+      body: `Task "${response.name}" đã được mở khoá.`,
+      data: {
+        taskId: dto.taskId,
+        reason: dto.reason,
+      },
+    });
+
+    return {
+      success: true,
+      data: response,
+    };
+  }
+
+  async processDueReminders(now = new Date()): Promise<number> {
+    const defaultReminderAt = new Date(
+      now.getTime() + taskScheduleConfig.reminderBeforeMinutes * 60 * 1000,
+    );
+    const tasks = await this.taskRepository.getTasksDueForReminder({
+      now,
+      defaultReminderAt,
+      take: taskScheduleConfig.batchSize,
+    });
+
+    let sentCount = 0;
+    for (const task of tasks) {
+      const marked = await this.taskRepository.markReminderSent({
+        taskId: task.id,
+        now,
+        defaultReminderAt,
+      });
+      if (!marked || !task.dueDate) {
+        continue;
+      }
+
+      sentCount += 1;
+      realtimeEventService.emitTaskDueSoon(task.id, {
+        taskId: task.id,
+        dueDate: task.dueDate,
+        reminderAt: task.reminderAt ?? null,
+      });
+      await this.notifyTaskRecipients({
+        taskId: task.id,
+        type: "TASK_DUE_SOON",
+        title: "Task sắp tới hạn",
+        body: `Task "${task.name}" sắp tới deadline.`,
+        data: {
+          taskId: task.id,
+          dueDate: task.dueDate.toISOString(),
+          reminderAt: task.reminderAt?.toISOString() ?? null,
+        },
+      });
+    }
+
+    return sentCount;
+  }
+
+  async processOverdueLocks(now = new Date()): Promise<number> {
+    const graceMs = taskScheduleConfig.lockGraceMinutes * 60 * 1000;
+    const lockBefore = new Date(now.getTime() - graceMs);
+    const tasks = await this.taskRepository.getOverdueTasksToLock({
+      now: lockBefore,
+      take: taskScheduleConfig.batchSize,
+    });
+
+    let lockedCount = 0;
+    for (const task of tasks) {
+      const lockedTask = await this.taskRepository.lockTaskAsOverdue(
+        task.id,
+        now,
+        lockBefore,
+      );
+      if (!lockedTask || !lockedTask.dueDate || !lockedTask.lockedAt) {
+        continue;
+      }
+
+      lockedCount += 1;
+      realtimeEventService.emitTaskOverdueLocked(task.id, {
+        taskId: task.id,
+        dueDate: lockedTask.dueDate,
+        lockedAt: lockedTask.lockedAt,
+        lockStatus: TaskLockStatus.OVERDUE_LOCKED,
+      });
+      await this.notifyTaskRecipients({
+        taskId: task.id,
+        type: "TASK_OVERDUE_LOCKED",
+        title: "Task quá hạn và đã bị khoá",
+        body: `Task "${lockedTask.name}" đã quá hạn hoàn thành.`,
+        data: {
+          taskId: task.id,
+          dueDate: lockedTask.dueDate.toISOString(),
+          lockedAt: lockedTask.lockedAt.toISOString(),
+          lockStatus: TaskLockStatus.OVERDUE_LOCKED,
+        },
+      });
+    }
+
+    return lockedCount;
+  }
+
   /**
    * Cập nhật `statusAction` cho task.
    * Quy tắc nghiệp vụ:
@@ -452,6 +827,14 @@ export class TaskService {
     if (!task) {
       throw new NotFoundException("Task not found");
     }
+    if (
+      task.lockStatus === TaskLockStatus.OVERDUE_LOCKED &&
+      dto.statusAction !== TaskStatusAction.DONE
+    ) {
+      throw new ForbiddenException(
+        "Task is locked because it is overdue. Please reschedule before changing status.",
+      );
+    }
 
     const isAssignee = await this.taskRepository.isTaskAssignee(
       dto.taskId,
@@ -466,6 +849,7 @@ export class TaskService {
     await this.taskRepository.updateTaskStatusAction(
       dto.taskId,
       dto.statusAction,
+      actorUserId,
     );
 
     const taskWithAssignments =
@@ -473,10 +857,15 @@ export class TaskService {
     if (!taskWithAssignments) {
       throw new NotFoundException("Task not found");
     }
+    const response = this.toTaskResponse(taskWithAssignments);
+
+    if (dto.statusAction === TaskStatusAction.DONE) {
+      realtimeEventService.emitTaskScheduleUpdated(dto.taskId, response);
+    }
 
     return {
       success: true,
-      data: this.toTaskResponse(taskWithAssignments),
+      data: response,
     };
   }
 }

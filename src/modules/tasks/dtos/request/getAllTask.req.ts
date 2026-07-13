@@ -1,4 +1,4 @@
-import { TaskStatus } from "@prisma/client";
+import { TaskLockStatus, TaskStatus } from "@prisma/client";
 import { ZodValidationSchema } from "@/common";
 import { z } from "zod";
 
@@ -6,7 +6,18 @@ const taskStatusValues = Object.values(TaskStatus) as [
   TaskStatus,
   ...TaskStatus[],
 ];
+const taskLockStatusValues = Object.values(TaskLockStatus) as [
+  TaskLockStatus,
+  ...TaskLockStatus[],
+];
 const taskTagModeValues = ["ANY", "ALL"] as const;
+const taskScheduleStateValues = [
+  "none",
+  "scheduled",
+  "due_soon",
+  "overdue_locked",
+  "done",
+] as const;
 
 const commaSeparatedUuidArraySchema = z.preprocess((value) => {
   if (typeof value !== "string") {
@@ -27,6 +38,10 @@ export class GetAllTaskRequestDto {
   name?: string;
   tagIds?: string[];
   tagMode?: "ANY" | "ALL";
+  dueBefore?: Date;
+  dueAfter?: Date;
+  scheduleState?: (typeof taskScheduleStateValues)[number];
+  lockStatus?: TaskLockStatus;
 
   constructor(data: GetAllTaskRequestDto) {
     this.listId = data.listId;
@@ -34,6 +49,10 @@ export class GetAllTaskRequestDto {
     this.name = data.name;
     this.tagIds = data.tagIds;
     this.tagMode = data.tagMode;
+    this.dueBefore = data.dueBefore ? new Date(data.dueBefore) : undefined;
+    this.dueAfter = data.dueAfter ? new Date(data.dueAfter) : undefined;
+    this.scheduleState = data.scheduleState;
+    this.lockStatus = data.lockStatus;
   }
 }
 
@@ -43,6 +62,10 @@ export const getAllTaskRequestQuery = z
     status: z.enum(taskStatusValues).optional(),
     tagIds: commaSeparatedUuidArraySchema.optional(),
     tagMode: z.enum(taskTagModeValues).optional(),
+    dueBefore: z.coerce.date().optional(),
+    dueAfter: z.coerce.date().optional(),
+    scheduleState: z.enum(taskScheduleStateValues).optional(),
+    lockStatus: z.enum(taskLockStatusValues).optional(),
   })
   .strict()
   .refine(
@@ -63,6 +86,16 @@ export const getAllTaskRequestQuery = z
     {
       message: "tagIds contains duplicates",
       path: ["tagIds"],
+    },
+  )
+  .refine(
+    (data) => {
+      if (!data.dueBefore || !data.dueAfter) return true;
+      return data.dueAfter < data.dueBefore;
+    },
+    {
+      message: "dueAfter must be before dueBefore",
+      path: ["dueAfter"],
     },
   );
 

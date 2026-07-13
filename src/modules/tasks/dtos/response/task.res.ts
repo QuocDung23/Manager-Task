@@ -1,4 +1,4 @@
-import { TaskStatus, TaskStatusAction } from "@prisma/client";
+import { TaskLockStatus, TaskStatus, TaskStatusAction } from "@prisma/client";
 import z from "zod";
 import {
   TaskTagSummaryDto,
@@ -30,12 +30,30 @@ type TaskTagLite = {
   };
 };
 
+export type TaskScheduleState =
+  | "none"
+  | "scheduled"
+  | "due_soon"
+  | "overdue_locked"
+  | "done";
+
 export class TaskResponseDto {
   id: string;
   name: string;
   description?: string;
   orderTask: number;
-  dueDate?: Date;
+  dueDate: Date | null;
+  reminderAt: Date | null;
+  reminderSentAt: Date | null;
+  overdueNotifiedAt: Date | null;
+  lockedAt: Date | null;
+  lockStatus: TaskLockStatus;
+  lockReason: string | null;
+  rescheduleCount: number;
+  completedAt: Date | null;
+  isLocked: boolean;
+  isOverdue: boolean;
+  scheduleState: TaskScheduleState;
   listId: string;
   assign: string[];
   tags: TaskTagSummaryDto[];
@@ -55,10 +73,24 @@ export class TaskResponseDto {
     this.name = data.name;
     this.description = data.description;
     this.orderTask = data.orderTask;
-    this.dueDate = data.dueDate;
+    this.dueDate = data.dueDate ?? null;
+    this.reminderAt = data.reminderAt ?? null;
+    this.reminderSentAt = data.reminderSentAt ?? null;
+    this.overdueNotifiedAt = data.overdueNotifiedAt ?? null;
+    this.lockedAt = data.lockedAt ?? null;
+    this.lockStatus = data.lockStatus ?? TaskLockStatus.UNLOCKED;
+    this.lockReason = data.lockReason ?? null;
+    this.rescheduleCount = data.rescheduleCount ?? 0;
+    this.completedAt = data.completedAt ?? null;
     this.listId = data.listId;
     this.status = data.status;
     this.statusAction = data.statusAction;
+    this.isLocked = this.lockStatus !== TaskLockStatus.UNLOCKED;
+    this.isOverdue =
+      this.dueDate !== null &&
+      this.dueDate.getTime() < Date.now() &&
+      !this.isTerminalAction();
+    this.scheduleState = this.resolveScheduleState();
 
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
@@ -89,6 +121,38 @@ export class TaskResponseDto {
         : [];
     }
   }
+
+  private isTerminalAction(): boolean {
+    return (
+      this.statusAction === TaskStatusAction.DONE ||
+      this.statusAction === TaskStatusAction.CANCELLED
+    );
+  }
+
+  private resolveScheduleState(): TaskScheduleState {
+    if (this.isTerminalAction()) {
+      return "done";
+    }
+
+    if (this.lockStatus === TaskLockStatus.OVERDUE_LOCKED) {
+      return "overdue_locked";
+    }
+
+    if (!this.dueDate) {
+      return "none";
+    }
+
+    const now = Date.now();
+    if (
+      this.reminderAt &&
+      this.reminderAt.getTime() <= now &&
+      this.dueDate.getTime() > now
+    ) {
+      return "due_soon";
+    }
+
+    return "scheduled";
+  }
 }
 
 export const taskResponseSchema = z.object({
@@ -96,7 +160,24 @@ export const taskResponseSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   orderTask: z.number().int(),
-  dueDate: z.date().optional(),
+  dueDate: z.date().nullable(),
+  reminderAt: z.date().nullable(),
+  reminderSentAt: z.date().nullable(),
+  overdueNotifiedAt: z.date().nullable(),
+  lockedAt: z.date().nullable(),
+  lockStatus: z.enum(TaskLockStatus),
+  lockReason: z.string().nullable(),
+  rescheduleCount: z.number().int(),
+  completedAt: z.date().nullable(),
+  isLocked: z.boolean(),
+  isOverdue: z.boolean(),
+  scheduleState: z.enum([
+    "none",
+    "scheduled",
+    "due_soon",
+    "overdue_locked",
+    "done",
+  ]),
   listId: z.string().uuid(),
   assign: z.array(z.string().uuid()),
   tags: z.array(taskTagSummarySchema),

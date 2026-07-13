@@ -2,9 +2,12 @@ import {
   Prisma,
   PrismaClient,
   tags,
+  TaskLockStatus,
+  TaskScheduleEventType,
   TaskStatus,
   TaskStatusAction,
   tasks,
+  UserStatus,
 } from "@prisma/client";
 import { PrismaService } from "../data/prisma.client";
 
@@ -62,6 +65,13 @@ export const taskDetailsInclude = {
   },
 } satisfies Prisma.tasksInclude;
 
+export type TaskScheduleStateFilter =
+  | "none"
+  | "scheduled"
+  | "due_soon"
+  | "overdue_locked"
+  | "done";
+
 export class TaskRepository {
   constructor(private readonly prisma = new PrismaService()) {}
 
@@ -71,26 +81,99 @@ export class TaskRepository {
     name?: string;
     tagIds?: string[];
     tagMode?: "ANY" | "ALL";
+    dueBefore?: Date;
+    dueAfter?: Date;
+    scheduleState?: TaskScheduleStateFilter;
+    lockStatus?: TaskLockStatus;
+    dueSoonBefore?: Date;
+    now?: Date;
   }): Promise<TaskWithDetails[]> {
-    const { listId, status, name, tagIds, tagMode = "ANY" } = args;
+    const {
+      listId,
+      status,
+      name,
+      tagIds,
+      tagMode = "ANY",
+      dueBefore,
+      dueAfter,
+      scheduleState,
+      lockStatus,
+      dueSoonBefore,
+      now = new Date(),
+    } = args;
 
     const where: Prisma.tasksWhereInput = {
       listId,
       deletedAt: null,
     };
+    const andConditions: Prisma.tasksWhereInput[] = [];
 
     if (status) {
       where.status = status;
+    }
+
+    if (lockStatus) {
+      where.lockStatus = lockStatus;
     }
 
     if (name) {
       where.name = { contains: name, mode: "insensitive" };
     }
 
+    if (dueBefore || dueAfter) {
+      where.dueDate = {
+        ...(dueAfter ? { gte: dueAfter } : {}),
+        ...(dueBefore ? { lte: dueBefore } : {}),
+      };
+    }
+
+    if (scheduleState) {
+      if (scheduleState === "none") {
+        where.dueDate = null;
+      }
+
+      if (scheduleState === "scheduled") {
+        andConditions.push({
+          dueDate: { not: null, gt: now },
+          lockStatus: TaskLockStatus.UNLOCKED,
+          statusAction: { notIn: [TaskStatusAction.DONE, TaskStatusAction.CANCELLED] },
+        });
+      }
+
+      if (scheduleState === "due_soon") {
+        andConditions.push({
+          dueDate: { not: null, gt: now },
+          lockStatus: TaskLockStatus.UNLOCKED,
+          statusAction: { notIn: [TaskStatusAction.DONE, TaskStatusAction.CANCELLED] },
+          OR: [
+            {
+              reminderAt: {
+                lte: now,
+              },
+            },
+            {
+              reminderAt: null,
+              dueDate: {
+                lte: dueSoonBefore ?? now,
+              },
+            },
+          ],
+        });
+      }
+
+      if (scheduleState === "overdue_locked") {
+        where.lockStatus = TaskLockStatus.OVERDUE_LOCKED;
+      }
+
+      if (scheduleState === "done") {
+        where.statusAction = TaskStatusAction.DONE;
+      }
+    }
+
     const uniqueTagIds = tagIds ? Array.from(new Set(tagIds)) : [];
     if (uniqueTagIds.length > 0) {
       if (tagMode === "ALL") {
-        where.AND = uniqueTagIds.map((tagId) => ({
+        andConditions.push(...uniqueTagIds.map((tagId) => ({
           taskTags: {
             some: {
               tagId,
@@ -100,7 +183,7 @@ export class TaskRepository {
               },
             },
           },
-        }));
+        })));
       } else {
         where.taskTags = {
           some: {
@@ -112,6 +195,10 @@ export class TaskRepository {
           },
         };
       }
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     return this.prisma.tasks.findMany({
@@ -178,8 +265,33 @@ export class TaskRepository {
     });
   }
 
-  async createTask(data: Prisma.tasksCreateInput): Promise<tasks> {
-    return this.prisma.tasks.create({ data });
+  async createTask(
+    data: Prisma.tasksCreateInput,
+    scheduleEvent?: {
+      actorId?: string;
+      newDueDate: Date;
+      reason?: string;
+      metadata?: Prisma.InputJsonValue;
+    },
+  ): Promise<tasks> {
+    if (!scheduleEvent) {
+      return this.prisma.tasks.create({ data });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const task = await tx.tasks.create({ data });
+      await tx.taskScheduleEvents.create({
+        data: {
+          taskId: task.id,
+          actorId: scheduleEvent.actorId,
+          type: TaskScheduleEventType.SCHEDULED,
+          newDueDate: scheduleEvent.newDueDate,
+          reason: scheduleEvent.reason,
+          metadata: scheduleEvent.metadata,
+        },
+      });
+      return task;
+    });
   }
 
   async updateTask(id: string, data: Prisma.tasksUpdateInput): Promise<tasks> {
@@ -413,10 +525,367 @@ export class TaskRepository {
   async updateTaskStatusAction(
     id: string,
     statusAction: TaskStatusAction,
+    actorId?: string,
   ): Promise<tasks> {
-    return this.prisma.tasks.update({
-      where: { id },
-      data: { statusAction },
+    const now = new Date();
+    const isDone = statusAction === TaskStatusAction.DONE;
+
+    return this.prisma.$transaction(async (tx) => {
+      const task = await tx.tasks.update({
+        where: { id },
+        data: {
+          statusAction,
+          completedAt: isDone ? now : null,
+          ...(isDone
+            ? {
+                lockStatus: TaskLockStatus.UNLOCKED,
+                lockedAt: null,
+                lockReason: null,
+              }
+            : {}),
+        },
+      });
+
+      if (isDone) {
+        await tx.taskScheduleEvents.create({
+          data: {
+            taskId: id,
+            actorId,
+            type: TaskScheduleEventType.COMPLETED,
+            oldDueDate: task.dueDate,
+            newDueDate: task.dueDate,
+            metadata: {
+              completedAt: now.toISOString(),
+            },
+          },
+        });
+      }
+
+      return task;
+    });
+  }
+
+  async updateTaskSchedule(args: {
+    taskId: string;
+    dueDate: Date;
+    reminderAt?: Date | null;
+    actorId?: string;
+    reason?: string;
+    eventType: TaskScheduleEventType;
+    oldDueDate?: Date | null;
+    incrementRescheduleCount?: boolean;
+  }): Promise<TaskWithDetails | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.tasks.update({
+        where: { id: args.taskId },
+        data: {
+          dueDate: args.dueDate,
+          reminderAt: args.reminderAt ?? null,
+          reminderSentAt: null,
+          overdueNotifiedAt: null,
+          lockStatus: TaskLockStatus.UNLOCKED,
+          lockedAt: null,
+          lockReason: null,
+          ...(args.incrementRescheduleCount
+            ? { rescheduleCount: { increment: 1 } }
+            : {}),
+        },
+      });
+
+      await tx.taskScheduleEvents.create({
+        data: {
+          taskId: args.taskId,
+          actorId: args.actorId,
+          type: args.eventType,
+          oldDueDate: args.oldDueDate ?? null,
+          newDueDate: args.dueDate,
+          reason: args.reason,
+          metadata: {
+            reminderAt: args.reminderAt?.toISOString() ?? null,
+          },
+        },
+      });
+
+      return tx.tasks.findFirst({
+        where: {
+          id: args.taskId,
+          deletedAt: null,
+        },
+        include: taskDetailsInclude,
+      });
+    });
+  }
+
+  async clearTaskSchedule(args: {
+    taskId: string;
+    actorId?: string;
+    reason?: string;
+    oldDueDate?: Date | null;
+  }): Promise<TaskWithDetails | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.tasks.update({
+        where: { id: args.taskId },
+        data: {
+          dueDate: null,
+          reminderAt: null,
+          reminderSentAt: null,
+          overdueNotifiedAt: null,
+        },
+      });
+
+      await tx.taskScheduleEvents.create({
+        data: {
+          taskId: args.taskId,
+          actorId: args.actorId,
+          type: TaskScheduleEventType.SCHEDULE_CLEARED,
+          oldDueDate: args.oldDueDate ?? null,
+          newDueDate: null,
+          reason: args.reason,
+        },
+      });
+
+      return tx.tasks.findFirst({
+        where: {
+          id: args.taskId,
+          deletedAt: null,
+        },
+        include: taskDetailsInclude,
+      });
+    });
+  }
+
+  async unlockTask(args: {
+    taskId: string;
+    actorId?: string;
+    reason: string;
+    oldDueDate?: Date | null;
+  }): Promise<TaskWithDetails | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.tasks.update({
+        where: { id: args.taskId },
+        data: {
+          lockStatus: TaskLockStatus.UNLOCKED,
+          lockedAt: null,
+          lockReason: null,
+        },
+      });
+
+      await tx.taskScheduleEvents.create({
+        data: {
+          taskId: args.taskId,
+          actorId: args.actorId,
+          type: TaskScheduleEventType.UNLOCKED,
+          oldDueDate: args.oldDueDate ?? null,
+          newDueDate: args.oldDueDate ?? null,
+          reason: args.reason,
+        },
+      });
+
+      return tx.tasks.findFirst({
+        where: {
+          id: args.taskId,
+          deletedAt: null,
+        },
+        include: taskDetailsInclude,
+      });
+    });
+  }
+
+  async getTaskNotificationRecipients(taskId: string): Promise<string[]> {
+    const assignments = await this.prisma.taskAssignments.findMany({
+      where: {
+        taskId,
+        deletedAt: null,
+        user: {
+          deletedAt: null,
+          status: UserStatus.ACTIVE,
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    return assignments.map((assignment) => assignment.userId);
+  }
+
+  async getTasksDueForReminder(args: {
+    now: Date;
+    defaultReminderAt: Date;
+    take: number;
+  }): Promise<TaskWithDetails[]> {
+    return this.prisma.tasks.findMany({
+      where: {
+        deletedAt: null,
+        status: TaskStatus.ACTIVE,
+        statusAction: {
+          notIn: [TaskStatusAction.DONE, TaskStatusAction.CANCELLED],
+        },
+        lockStatus: TaskLockStatus.UNLOCKED,
+        reminderSentAt: null,
+        dueDate: {
+          gt: args.now,
+        },
+        OR: [
+          {
+            reminderAt: {
+              lte: args.now,
+            },
+          },
+          {
+            reminderAt: null,
+            dueDate: {
+              lte: args.defaultReminderAt,
+            },
+          },
+        ],
+      },
+      orderBy: {
+        dueDate: "asc",
+      },
+      take: args.take,
+      include: taskDetailsInclude,
+    });
+  }
+
+  async markReminderSent(args: {
+    taskId: string;
+    now: Date;
+    defaultReminderAt: Date;
+  }): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.tasks.updateMany({
+        where: {
+          id: args.taskId,
+          deletedAt: null,
+          status: TaskStatus.ACTIVE,
+          statusAction: {
+            notIn: [TaskStatusAction.DONE, TaskStatusAction.CANCELLED],
+          },
+          lockStatus: TaskLockStatus.UNLOCKED,
+          reminderSentAt: null,
+          dueDate: {
+            gt: args.now,
+          },
+          OR: [
+            {
+              reminderAt: {
+                lte: args.now,
+              },
+            },
+            {
+              reminderAt: null,
+              dueDate: {
+                lte: args.defaultReminderAt,
+              },
+            },
+          ],
+        },
+        data: {
+          reminderSentAt: args.now,
+        },
+      });
+
+      if (result.count === 0) {
+        return false;
+      }
+
+      const task = await tx.tasks.findUnique({
+        where: { id: args.taskId },
+        select: { dueDate: true },
+      });
+
+      await tx.taskScheduleEvents.create({
+        data: {
+          taskId: args.taskId,
+          type: TaskScheduleEventType.REMINDER_SENT,
+          oldDueDate: task?.dueDate ?? null,
+          newDueDate: task?.dueDate ?? null,
+          metadata: {
+            reminderSentAt: args.now.toISOString(),
+          },
+        },
+      });
+
+      return true;
+    });
+  }
+
+  async getOverdueTasksToLock(args: {
+    now: Date;
+    take: number;
+  }): Promise<TaskWithDetails[]> {
+    return this.prisma.tasks.findMany({
+      where: {
+        deletedAt: null,
+        status: TaskStatus.ACTIVE,
+        statusAction: {
+          notIn: [TaskStatusAction.DONE, TaskStatusAction.CANCELLED],
+        },
+        lockStatus: TaskLockStatus.UNLOCKED,
+        dueDate: {
+          lt: args.now,
+        },
+      },
+      orderBy: {
+        dueDate: "asc",
+      },
+      take: args.take,
+      include: taskDetailsInclude,
+    });
+  }
+
+  async lockTaskAsOverdue(
+    taskId: string,
+    now: Date,
+    overdueBefore: Date = now,
+  ): Promise<TaskWithDetails | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.tasks.updateMany({
+        where: {
+          id: taskId,
+          deletedAt: null,
+          lockStatus: TaskLockStatus.UNLOCKED,
+          dueDate: {
+            lt: overdueBefore,
+          },
+          statusAction: {
+            notIn: [TaskStatusAction.DONE, TaskStatusAction.CANCELLED],
+          },
+        },
+        data: {
+          lockStatus: TaskLockStatus.OVERDUE_LOCKED,
+          lockedAt: now,
+          lockReason: "Task quá hạn hoàn thành",
+          overdueNotifiedAt: now,
+        },
+      });
+
+      if (result.count === 0) {
+        return null;
+      }
+
+      const task = await tx.tasks.findFirst({
+        where: {
+          id: taskId,
+          deletedAt: null,
+        },
+        include: taskDetailsInclude,
+      });
+
+      await tx.taskScheduleEvents.create({
+        data: {
+          taskId,
+          type: TaskScheduleEventType.OVERDUE_LOCKED,
+          oldDueDate: task?.dueDate ?? null,
+          newDueDate: task?.dueDate ?? null,
+          metadata: {
+            lockedAt: now.toISOString(),
+          },
+        },
+      });
+
+      return task;
     });
   }
 

@@ -1,6 +1,8 @@
-import { boardMembersPartialWithRelations, boards } from "@/models";
+import { boards } from "@/models";
 import { PrismaService } from "../data";
 import { BoardStatus, Prisma } from "@prisma/client";
+
+type BoardWithOwner = Prisma.boardsGetPayload<{ include: { user: true } }>;
 
 export class BoardRepository {
   constructor(private readonly prisma = new PrismaService()) {}
@@ -76,7 +78,7 @@ export class BoardRepository {
     board,
   }: {
     board: Prisma.boardsCreateInput;
-  }): Promise<boardMembersPartialWithRelations> {
+  }): Promise<BoardWithOwner> {
     return this.prisma.boards.create({
       include: {
         user: true,

@@ -18,12 +18,12 @@ generator zod {
   output                           = "../src/models" // default is ./generated/zod
   useMultipleFiles                 = true // default is false
   writeBarrelFiles                 = true // default is true
-  createInputTypes                 = true // default is false
+  createInputTypes                 = false // default is false
   createModelTypes                 = true // default is false
   addInputTypeValidation           = true // default is false
-  addIncludeType                   = true // default is false
-  addSelectType                    = true // default is false
-  validateWhereUniqueInput         = true // default is false
+  addIncludeType                   = false // default is false
+  addSelectType                    = false // default is false
+  validateWhereUniqueInput         = false // default is false
   createOptionalDefaultValuesTypes = true // default is false
   createRelationValuesTypes        = true // default is false
   createPartialTypes               = true // default is false
@@ -67,6 +67,22 @@ enum TaskStatusAction {
   PAUSED      @map("paused")
   FIXED       @map("fixed")
   CANCELLED   @map("cancelled")
+}
+
+enum TaskLockStatus {
+  UNLOCKED       @map("unlocked")
+  OVERDUE_LOCKED @map("overdue_locked")
+  MANUAL_LOCKED  @map("manual_locked")
+}
+
+enum TaskScheduleEventType {
+  SCHEDULED        @map("scheduled")
+  RESCHEDULED      @map("rescheduled")
+  SCHEDULE_CLEARED @map("schedule_cleared")
+  REMINDER_SENT    @map("reminder_sent")
+  OVERDUE_LOCKED   @map("overdue_locked")
+  UNLOCKED         @map("unlocked")
+  COMPLETED        @map("completed")
 }
 
 enum TagStatus {
@@ -123,6 +139,7 @@ model users {
 
   taskAssignments         taskAssignments[]
   assignedTaskAssignments taskAssignments[] @relation("TaskAssignedBy")
+  taskScheduleEvents      taskScheduleEvents[]
 
 
   taskComments taskComments[]
@@ -312,6 +329,14 @@ model tasks {
   description  String
   orderTask    Int              @default(0)
   dueDate      DateTime?        @map("due_date")
+  reminderAt        DateTime?      @map("reminder_at")
+  reminderSentAt    DateTime?      @map("reminder_sent_at")
+  overdueNotifiedAt DateTime?      @map("overdue_notified_at")
+  lockedAt          DateTime?      @map("locked_at")
+  lockStatus        TaskLockStatus @default(UNLOCKED) @map("lock_status")
+  lockReason        String?        @map("lock_reason")
+  rescheduleCount   Int            @default(0) @map("reschedule_count")
+  completedAt       DateTime?      @map("completed_at")
   listId       String           @map("list_id")
   list         lists            @relation(fields: [listId], references: [id])
   status       TaskStatus       @default(ACTIVE)
@@ -324,8 +349,32 @@ model tasks {
   taskAssignments taskAssignments[]
   taskComments    taskComments[]
   taskTags        taskTags[]
+  taskScheduleEvents taskScheduleEvents[]
 
+  @@index([dueDate, deletedAt])
+  @@index([lockStatus, dueDate])
+  @@index([reminderSentAt, dueDate])
   @@map("tasks")
+}
+
+model taskScheduleEvents {
+  id      String                @id @default(uuid())
+  taskId  String                @map("task_id")
+  task    tasks                 @relation(fields: [taskId], references: [id])
+  actorId String?               @map("actor_id")
+  actor   users?                @relation(fields: [actorId], references: [id])
+  type    TaskScheduleEventType
+
+  oldDueDate DateTime? @map("old_due_date")
+  newDueDate DateTime? @map("new_due_date")
+  reason     String?
+  metadata   Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([taskId, createdAt])
+  @@index([actorId])
+  @@map("taskScheduleEvents")
 }
 
 model tags {

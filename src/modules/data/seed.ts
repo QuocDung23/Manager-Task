@@ -18,6 +18,10 @@ const allPermissions = [
   ...Object.values(TaskPermissions),
 ];
 
+const memberTaskPermissions = Object.values(TaskPermissions).filter(
+  (permission) => permission !== TaskPermissions.UNLOCK_TASK,
+);
+
 const rolePermissionMap: Record<string, readonly string[]> = {
   [UserRole.SUPER_ADMIN]: [
     ...Object.values(UserPermissions),
@@ -46,7 +50,7 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     ProjectPermissions.CREATE_BOARD,
 
     ...Object.values(ListPermissions),
-    ...Object.values(TaskPermissions),
+    ...memberTaskPermissions,
   ],
 
   [BoardRole.BOARD_ADMIN]: [
@@ -81,6 +85,10 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     TaskPermissions.UPDATE_TASK_COMMENT,
     TaskPermissions.DELETE_TASK_COMMENT,
     TaskPermissions.UPDATE_TASK_STATUS_ACTION,
+    TaskPermissions.SCHEDULE_TASK,
+    TaskPermissions.RESCHEDULE_TASK,
+    TaskPermissions.CLEAR_TASK_SCHEDULE,
+    TaskPermissions.COMPLETE_TASK,
   ],
 };
 

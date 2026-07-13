@@ -1,5 +1,6 @@
 import { BadRequest, Exception } from "@tsed/exceptions";
 import {
+  ForbiddenException,
   HttpResponseBodySuccessDto,
   NotFoundException,
 } from "@/common";
@@ -9,7 +10,7 @@ import {
   TaskRepository,
   TaskWithDetails,
 } from "@/modules/tasks/task.repository";
-import { Prisma } from "@prisma/client";
+import { Prisma, TaskLockStatus } from "@prisma/client";
 import {
   AttachTaskTagRequestDto,
   CreateTagRequestDto,
@@ -34,6 +35,7 @@ type ResolvedTaskContext = {
   taskId: string;
   listId: string;
   boardId: string;
+  lockStatus: TaskLockStatus;
 };
 
 export class TaskTagService {
@@ -54,6 +56,14 @@ export class TaskTagService {
 
   private toTaskResponse(task: TaskWithDetails): TaskResponseDto {
     return new TaskResponseDto(task as unknown as TaskResponseDto);
+  }
+
+  private assertTaskNotLocked(ctx: ResolvedTaskContext, action: string): void {
+    if (ctx.lockStatus === TaskLockStatus.OVERDUE_LOCKED) {
+      throw new ForbiddenException(
+        `Task is locked because it is overdue. Please reschedule before ${action}.`,
+      );
+    }
   }
 
   private async getActiveBoardOrThrow(boardId: string): Promise<void> {
@@ -78,6 +88,7 @@ export class TaskTagService {
       taskId: task.id,
       listId: task.listId,
       boardId: task.list.boardId,
+      lockStatus: task.lockStatus,
     };
   }
 
@@ -226,6 +237,7 @@ export class TaskTagService {
     }
 
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
+    this.assertTaskNotLocked(ctx, "changing task tags");
     if (uniqueTagIds.length > 0) {
       await this.assertAllTagsBelongToBoard({
         boardId: ctx.boardId,
@@ -251,6 +263,7 @@ export class TaskTagService {
     dto: AttachTaskTagRequestDto,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
+    this.assertTaskNotLocked(ctx, "changing task tags");
     await this.getActiveTagInBoardOrThrow({
       boardId: ctx.boardId,
       tagId: dto.tagId,
@@ -274,6 +287,7 @@ export class TaskTagService {
     dto: DetachTaskTagRequestDto,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
+    this.assertTaskNotLocked(ctx, "changing task tags");
     await this.getActiveTagInBoardOrThrow({
       boardId: ctx.boardId,
       tagId: dto.tagId,
