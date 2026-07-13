@@ -19,6 +19,8 @@ import {
   unassignTaskRequestValidationSchema,
   updateTaskRequestSchema,
   updateTaskRequestValidationSchema,
+  updateTaskStatusActionRequestSchema,
+  updateTaskStatusActionRequestValidationSchema,
 } from "./dtos/request";
 import {
   moveTaskResponseSchema,
@@ -127,6 +129,25 @@ router.delete(
   validateRequestMiddleware(unassignTaskRequestValidationSchema),
   authMiddleware.verifyTaskPermission(TaskPermissions.UNASSIGN_TASK),
   taskController.unassignTask,
+);
+
+// PATCH /task/:taskId/status-action - đổi trạng thái hành động của task
+// Lưu ý: route này được khai báo TRƯỚC route /:id để tránh Express match nhầm dynamic route.
+taskRegistry.registerPath({
+  method: "patch",
+  path: "/task/{taskId}/status-action",
+  tags: ["Tasks"],
+  request: updateTaskStatusActionRequestSchema,
+  responses: createApiResponse(taskResponseSchema, "Success", StatusCodes.OK),
+});
+router.patch(
+  "/:taskId/status-action",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(updateTaskStatusActionRequestValidationSchema),
+  authMiddleware.verifyTaskPermission(
+    TaskPermissions.UPDATE_TASK_STATUS_ACTION,
+  ),
+  taskController.updateTaskStatusAction,
 );
 
 // GET /task/:id - chi tiết task

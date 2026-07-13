@@ -5,3 +5,4 @@ export * from "./updateTask.req";
 export * from "./moveTask.req";
 export * from "./assignTask.req";
 export * from "./unassignTask.req";
+export * from "./updateTaskStatusAction.req";

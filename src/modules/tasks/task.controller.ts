@@ -7,6 +7,7 @@ import {
   MoveTaskRequestDto,
   UnassignTaskRequestDto,
   updateTaskRequestDto,
+  UpdateTaskStatusActionRequestDto,
 } from "./dtos/request";
 import { TaskService } from "./task.service";
 import { Request, Response } from "express";
@@ -125,6 +126,34 @@ export class TaskController {
     } as UnassignTaskRequestDto);
 
     const result = await this.taskService.unassignTask(unassignTaskDto);
+    if (result instanceof Exception) {
+      throw new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  /**
+   * PATCH /task/:taskId/status-action
+   * Đổi trạng thái hành động hiện tại của task. Chỉ assignee mới được đổi
+   * (service sẽ kiểm tra; middleware chỉ đảm bảo actor có quyền trong board).
+   */
+  async updateTaskStatusAction(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    const taskId = req.params.taskId as string;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
+
+    const dto = new UpdateTaskStatusActionRequestDto({
+      ...(req.body as any),
+      taskId,
+    } as UpdateTaskStatusActionRequestDto);
+
+    const result = await this.taskService.updateTaskStatusAction(
+      dto,
+      actorUserId,
+    );
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }

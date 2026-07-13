@@ -14,6 +14,7 @@ import {
   MoveTaskRequestDto,
   UnassignTaskRequestDto,
   updateTaskRequestDto,
+  UpdateTaskStatusActionRequestDto,
 } from "./dtos/request";
 
 import { MoveTaskResponseDto, TaskResponseDto } from "./dtos/response";
@@ -429,6 +430,53 @@ export class TaskService {
     return {
       success: true,
       data: this.toTaskResponse(updatedTask),
+    };
+  }
+
+  /**
+   * Cập nhật `statusAction` cho task.
+   * Quy tắc nghiệp vụ:
+   *  - task phải tồn tại và chưa bị soft delete (handled by `getTaskById`).
+   *  - chỉ user đang là assignee active của task mới được đổi `statusAction`.
+   *  - `statusAction` được Zod validate ở tầng middleware nên không cần check lại.
+   */
+  async updateTaskStatusAction(
+    dto: UpdateTaskStatusActionRequestDto,
+    actorUserId?: string,
+  ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
+    if (!actorUserId) {
+      throw new ForbiddenException("Missing actor");
+    }
+
+    const task = await this.taskRepository.getTaskById(dto.taskId);
+    if (!task) {
+      throw new NotFoundException("Task not found");
+    }
+
+    const isAssignee = await this.taskRepository.isTaskAssignee(
+      dto.taskId,
+      actorUserId,
+    );
+    if (!isAssignee) {
+      throw new ForbiddenException(
+        "Only assigned members can update task status action",
+      );
+    }
+
+    await this.taskRepository.updateTaskStatusAction(
+      dto.taskId,
+      dto.statusAction,
+    );
+
+    const taskWithAssignments =
+      await this.taskRepository.getTaskByIdWithAssignments(dto.taskId);
+    if (!taskWithAssignments) {
+      throw new NotFoundException("Task not found");
+    }
+
+    return {
+      success: true,
+      data: this.toTaskResponse(taskWithAssignments),
     };
   }
 }

@@ -1,4 +1,11 @@
-import { Prisma, PrismaClient, tags, TaskStatus, tasks } from "@prisma/client";
+import {
+  Prisma,
+  PrismaClient,
+  tags,
+  TaskStatus,
+  TaskStatusAction,
+  tasks,
+} from "@prisma/client";
 import { PrismaService } from "../data/prisma.client";
 
 type PrismaTx = Omit<
@@ -379,6 +386,37 @@ export class TaskRepository {
         id: true,
         deletedAt: true,
       },
+    });
+  }
+
+  /**
+   * Kiểm tra một user có đang là assignee active của task hay không.
+   * Record `taskAssignments` được coi là active khi `deletedAt = null`
+   * và task cũng phải chưa bị soft delete (đã được middleware check trước).
+   */
+  async isTaskAssignee(taskId: string, userId: string): Promise<boolean> {
+    const assignment = await this.prisma.taskAssignments.findFirst({
+      where: {
+        taskId,
+        userId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    return Boolean(assignment);
+  }
+
+  /**
+   * Cập nhật `statusAction` cho task đang active.
+   * Trả về Prisma record sau khi update (chưa include assignments).
+   */
+  async updateTaskStatusAction(
+    id: string,
+    statusAction: TaskStatusAction,
+  ): Promise<tasks> {
+    return this.prisma.tasks.update({
+      where: { id },
+      data: { statusAction },
     });
   }
 

@@ -80,6 +80,7 @@ const rolePermissionMap: Record<string, readonly string[]> = {
     TaskPermissions.CREATE_TASK_COMMENT,
     TaskPermissions.UPDATE_TASK_COMMENT,
     TaskPermissions.DELETE_TASK_COMMENT,
+    TaskPermissions.UPDATE_TASK_STATUS_ACTION,
   ],
 };
 
