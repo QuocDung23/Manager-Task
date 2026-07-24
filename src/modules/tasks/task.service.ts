@@ -33,6 +33,7 @@ import { BoardMemberRepository } from "@/modules/boardMember/boardMember.reposit
 import { TaskWithAssignments, TaskRepository } from "./task.repository";
 import { taskScheduleConfig } from "@/configs";
 import { realtimeEventService } from "@/modules/realtime";
+import { notificationService } from "@/modules/notification";
 
 const ORDER_STEP = 65536;
 
@@ -749,6 +750,22 @@ export class TaskService {
         dueDate: task.dueDate,
         reminderAt: task.reminderAt ?? null,
       });
+
+      // Gửi email cho tất cả assignees song song
+      const assignees = await this.taskRepository.getTaskAssignees(task.id);
+      const dueDate = task.dueDate!;
+      await Promise.all(
+        assignees.map((assignee) =>
+          notificationService.sendTaskDueSoonEmail({
+            taskId: task.id,
+            taskName: task.name,
+            dueDate,
+            assigneeEmail: assignee.email,
+            assigneeName: assignee.name,
+          }),
+        ),
+      );
+
       await this.notifyTaskRecipients({
         taskId: task.id,
         type: "TASK_DUE_SOON",
@@ -791,6 +808,24 @@ export class TaskService {
         lockedAt: lockedTask.lockedAt,
         lockStatus: TaskLockStatus.OVERDUE_LOCKED,
       });
+
+      // Gửi email thông báo quá hạn cho tất cả assignees song song
+      const assignees = await this.taskRepository.getTaskAssignees(task.id);
+      const dueDate = lockedTask.dueDate!;
+      const lockedAt = lockedTask.lockedAt!;
+      await Promise.all(
+        assignees.map((assignee) =>
+          notificationService.sendTaskOverdueEmail({
+            taskId: task.id,
+            taskName: lockedTask.name,
+            dueDate,
+            lockedAt,
+            assigneeEmail: assignee.email,
+            assigneeName: assignee.name,
+          }),
+        ),
+      );
+
       await this.notifyTaskRecipients({
         taskId: task.id,
         type: "TASK_OVERDUE_LOCKED",

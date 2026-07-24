@@ -709,6 +709,36 @@ export class TaskRepository {
     return assignments.map((assignment) => assignment.userId);
   }
 
+  async getTaskAssignees(
+    taskId: string,
+  ): Promise<Array<{ id: string; email: string; name: string }>> {
+    const assignments = await this.prisma.taskAssignments.findMany({
+      where: {
+        taskId,
+        deletedAt: null,
+        user: {
+          deletedAt: null,
+          status: UserStatus.ACTIVE,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return assignments.map((a) => ({
+      id: a.user.id,
+      email: a.user.email,
+      name: a.user.name,
+    }));
+  }
+
   async getTasksDueForReminder(args: {
     now: Date;
     defaultReminderAt: Date;
