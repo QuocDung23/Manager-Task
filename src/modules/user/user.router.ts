@@ -37,7 +37,7 @@ autoBindUtil(userController);
 
 userRegistry.registerPath({
   method: "get",
-  path: "/users",
+  path: "/user",
   tags: ["User"],
   request: getUsersRequestSchema,
   responses: createApiResponse(

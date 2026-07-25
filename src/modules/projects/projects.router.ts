@@ -31,6 +31,10 @@ import {
   updateProjectRequestSchema,
   updateProjectRequestValidationSchema,
 } from "./dtos/request/updateProject.req";
+import {
+  createProjectRequestSchema,
+  createProjectRequestValidationSchema,
+} from "./dtos/request/createProject.req";
 
 export const projectRegistry = new OpenAPIRegistry();
 
@@ -42,7 +46,7 @@ autoBindUtil(boardController);
 
 projectRegistry.registerPath({
   method: "get",
-  path: "/project/getAlls",
+  path: "/project",
   tags: ["Projects"],
   request: getAllProjectRequestSchema,
   responses: createApiResponse(
@@ -52,10 +56,28 @@ projectRegistry.registerPath({
   ),
 });
 router.get(
-  "/getAlls",
+  "/",
   authMiddleware.verifyAccessToken,
   validateRequestMiddleware(getAllProjectRequestValidationSchema),
   projectController.getAllProject,
+);
+
+projectRegistry.registerPath({
+  method: "post",
+  path: "/project",
+  tags: ["Projects"],
+  request: createProjectRequestSchema,
+  responses: createApiResponse(
+    projectResponseSchema,
+    "Success",
+    StatusCodes.CREATED,
+  ),
+});
+router.post(
+  "/",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(createProjectRequestValidationSchema),
+  projectController.createProject,
 );
 
 projectRegistry.registerPath({
@@ -84,7 +106,7 @@ projectRegistry.registerPath({
   responses: createApiResponse(
     boardResponseSchema,
     "Success",
-    StatusCodes.OK,
+    StatusCodes.CREATED,
   ),
 });
 router.post(
@@ -96,8 +118,8 @@ router.post(
 );
 
 projectRegistry.registerPath({
-  method: "put",
-  path: "/project/{projectId}/update",
+  method: "patch",
+  path: "/project/{projectId}",
   tags: ["Projects"],
   request: updateProjectRequestSchema,
   responses: createApiResponse(
@@ -106,22 +128,13 @@ projectRegistry.registerPath({
     StatusCodes.OK,
   ),
 });
-router.put(
-  "/:projectId/update",
-  authMiddleware.verifyAccessToken,
-  authMiddleware.verifyProjectPermission(ProjectPermissions.UPDATE_PROJECT),
-  validateRequestMiddleware(updateProjectRequestValidationSchema),
-  projectController.updateProject,
-);
-
-router.put(
+router.patch(
   "/:projectId",
   authMiddleware.verifyAccessToken,
   authMiddleware.verifyProjectPermission(ProjectPermissions.UPDATE_PROJECT),
   validateRequestMiddleware(updateProjectRequestValidationSchema),
   projectController.updateProject,
 );
-
 projectRegistry.registerPath({
   method: "delete",
   path: "/project/{projectId}",
@@ -149,7 +162,7 @@ projectRegistry.registerPath({
   responses: createApiResponse(
     z.array(projectMemberResponseSchema),
     "Success",
-    StatusCodes.OK,
+    StatusCodes.CREATED,
   ),
 });
 router.post(

@@ -15,19 +15,15 @@ export class GetAllBoardRequestDto {
 }
 
 export const getAllBoardRequestQuery = z.object({
+  projectId: z.string().uuid(),
   name: z.string().optional(),
   status: z.enum(BoardStatus).optional(),
-});
-export const getAllBoardRequestParamsSchema = z.object({
-  projectId: z.string().uuid(),
 });
 
 export const getAllBoardRequestValidationSchema: ZodValidationSchema = {
   query: getAllBoardRequestQuery,
-  params: getAllBoardRequestParamsSchema,
 };
 
 export const getAllBoardRequestSchema = {
   query: getAllBoardRequestQuery,
-  params: getAllBoardRequestParamsSchema,
 };

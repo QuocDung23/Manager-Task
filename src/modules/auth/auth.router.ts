@@ -22,12 +22,6 @@ import {
   verifyRequestValidationSchema,
 } from "./dtos/requests/verifyAcc.req";
 import authMiddleware from "@/common/middlewares/auth.middleware";
-import { ProjectController } from "../projects/projects.controller";
-import { projectResponseSchema } from "../projects/dtos/response/project.res";
-import {
-  createProjectRequestSchema,
-  createProjectRequestValidationSchema,
-} from "../projects/dtos/request/createProject.req";
 import {
   resetPasswordRequestSchema,
   resetPasswordRequestValidationSchema,
@@ -40,10 +34,8 @@ import {
 export const authRegistry = new OpenAPIRegistry();
 
 const authController = new AuthController();
-const projectController = new ProjectController();
 const router = express.Router({ mergeParams: true });
 autoBindUtil(authController);
-autoBindUtil(projectController);
 
 authRegistry.registerPath({
   method: "post",
@@ -77,13 +69,13 @@ router.post(
 
 authRegistry.registerPath({
   method: "post",
-  path: "/auth/sendOtp",
+  path: "/auth/otp",
   tags: ["Auth"],
   request: sendOtpRequestSchema,
   responses: createApiResponse(z.null(), "Success"),
 });
 router.post(
-  "/sendOtp",
+  "/otp",
   validateRequestMiddleware(sendOtpRequestValidationSchema),
   authController.sendOtp,
 );
@@ -116,28 +108,9 @@ router.post(
   authMiddleware.verifyRefreshToken,
   authController.refreshToken,
 );
-
 authRegistry.registerPath({
   method: "post",
-  path: "/auth/create-project",
-  tags: ["Auth"],
-  request: createProjectRequestSchema,
-  responses: createApiResponse(
-    projectResponseSchema,
-    "Success",
-    StatusCodes.CREATED,
-  ),
-});
-router.post(
-  "/create-project",
-  authMiddleware.verifyAccessToken,
-  validateRequestMiddleware(createProjectRequestValidationSchema),
-  projectController.createProject,
-);
-
-authRegistry.registerPath({
-  method: "post",
-  path: "/auth/verifyOtp",
+  path: "/auth/otp/verification",
   tags: ["Auth"],
   request: verifyRequestSchema,
   responses: createApiResponse(
@@ -147,14 +120,14 @@ authRegistry.registerPath({
   ),
 });
 router.post(
-  "/verifyOtp",
+  "/otp/verification",
   validateRequestMiddleware(verifyRequestValidationSchema),
   authController.verifyOtp,
 );
 
 authRegistry.registerPath({
   method: "post",
-  path: "/auth/resetPassword",
+  path: "/auth/password-reset",
   tags: ["Auth"],
   request: resetPasswordRequestSchema,
   responses: createApiResponse(
@@ -164,7 +137,7 @@ authRegistry.registerPath({
   ),
 });
 router.post(
-  "/resetPassword",
+  "/password-reset",
   validateRequestMiddleware(resetPasswordRequestValidationSchema),
   authController.resetPassword,
 );

@@ -14,8 +14,7 @@ export class BoardController {
   constructor(private readonly boardService = new BoardService()) {}
 
   async getAllBoards(req: Request, res: Response): Promise<Response> {
-    const user = (req as any).user;
-    const projectId = req.params.projectId as string;
+    const projectId = req.query.projectId as string;
     const getAllBoard = new GetAllBoardRequestDto({
       ...(req.query as any),
       projectId,

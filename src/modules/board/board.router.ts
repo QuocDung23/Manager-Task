@@ -52,13 +52,13 @@ autoBindUtil(listController);
 
 boardRegistry.registerPath({
   method: "get",
-  path: "/board/{projectId}/getAlls",
+  path: "/board",
   tags: ["Boards"],
   request: getAllBoardRequestSchema,
   responses: createApiResponse(boardResponseSchema, "Success", StatusCodes.OK),
 });
 router.get(
-  "/:projectId/getAlls",
+  "/",
   authMiddleware.verifyAccessToken,
   authMiddleware.verifyProjectPermission(ProjectPermissions.VIEW_PROJECT),
   validateRequestMiddleware(getAllBoardRequestValidationSchema),
@@ -81,14 +81,14 @@ router.get(
 );
 
 boardRegistry.registerPath({
-  method: "put",
-  path: "/board/{boardId}/update",
+  method: "patch",
+  path: "/board/{boardId}",
   tags: ["Boards"],
   request: updateBoardRequestSchema,
   responses: createApiResponse(boardResponseSchema, "Success", StatusCodes.OK),
 });
-router.put(
-  "/:boardId/update",
+router.patch(
+  "/:boardId",
   authMiddleware.verifyAccessToken,
   authMiddleware.verifyBoardPermission(BoardPermissions.UPDATE_BOARD),
   validateRequestMiddleware(updateBoardRequestValidationSchema),
@@ -97,13 +97,13 @@ router.put(
 
 boardRegistry.registerPath({
   method: "delete",
-  path: "/board/{boardId}/delete",
+  path: "/board/{boardId}",
   tags: ["Boards"],
   request: deleteBoardRequestSchema,
   responses: createApiResponse(boardResponseSchema, "Success", StatusCodes.OK),
 });
 router.delete(
-  "/:boardId/delete",
+  "/:boardId",
   authMiddleware.verifyAccessToken,
   authMiddleware.verifyBoardPermission(BoardPermissions.DELETE_BOARD),
   validateRequestMiddleware(deleteBoardRequestValidationSchema),
@@ -115,7 +115,11 @@ boardRegistry.registerPath({
   path: "/board/{boardId}/members",
   tags: ["Boards"],
   request: addMemberBoardRequestSchema,
-  responses: createApiResponse(boardResponseSchema, "Success", StatusCodes.OK),
+  responses: createApiResponse(
+    boardResponseSchema,
+    "Success",
+    StatusCodes.CREATED,
+  ),
 });
 router.post(
   "/:boardId/members",
@@ -147,7 +151,7 @@ router.get(
 
 boardRegistry.registerPath({
   method: "post",
-  path: "/board/{boardId}/create-lists",
+  path: "/board/{boardId}/lists",
   tags: ["Boards"],
   request: createListRequestSchema,
   responses: createApiResponse(
@@ -157,7 +161,7 @@ boardRegistry.registerPath({
   ),
 });
 router.post(
-  "/:boardId/create-lists",
+  "/:boardId/lists",
   authMiddleware.verifyAccessToken,
   authMiddleware.verifyBoardPermission(BoardPermissions.CREATE_LIST),
   validateRequestMiddleware(createListRequestValidationSchema),
