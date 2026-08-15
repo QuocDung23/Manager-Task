@@ -2,7 +2,6 @@ import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { ProjectController } from "./projects.controller";
 import { BoardController } from "../board/board.controller";
 import express from "express";
-import { z } from "zod";
 import { autoBindUtil, validateRequestMiddleware } from "@/common";
 import {
   getProjectSchema,
@@ -12,8 +11,16 @@ import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
   addProjectMemberRequestSchema,
   addProjectMemberRequestValidationSchema,
+  deleteProjectMemberRequestSchema,
+  deleteProjectMemberRequestValidationSchema,
+  getProjectMembersRequestSchema,
+  getProjectMembersRequestValidationSchema,
+  projectCountResponseSchema,
   projectMemberResponseSchema,
+  projectMembersResponseSchema,
   projectResponseSchema,
+  updateProjectMemberRequestSchema,
+  updateProjectMemberRequestValidationSchema,
 } from "./dtos";
 import { StatusCodes } from "http-status-codes";
 import authMiddleware from "@/common/middlewares/auth.middleware";
@@ -63,6 +70,24 @@ router.get(
 );
 
 projectRegistry.registerPath({
+  method: "get",
+  path: "/project/count",
+  tags: ["Projects"],
+  request: getAllProjectRequestSchema,
+  responses: createApiResponse(
+    projectCountResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.get(
+  "/count",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(getAllProjectRequestValidationSchema),
+  projectController.countProjects,
+);
+
+projectRegistry.registerPath({
   method: "post",
   path: "/project",
   tags: ["Projects"],
@@ -94,6 +119,7 @@ projectRegistry.registerPath({
 router.get(
   "/:projectId",
   authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(ProjectPermissions.VIEW_PROJECT),
   validateRequestMiddleware(getProjectRequestVadilationSchema),
   projectController.getProjectById,
 );
@@ -160,7 +186,7 @@ projectRegistry.registerPath({
   tags: ["Projects"],
   request: addProjectMemberRequestSchema,
   responses: createApiResponse(
-    z.array(projectMemberResponseSchema),
+    projectMemberResponseSchema,
     "Success",
     StatusCodes.CREATED,
   ),
@@ -171,6 +197,67 @@ router.post(
   authMiddleware.verifyProjectPermission(ProjectPermissions.ADD_MEMBER_PROJECT),
   validateRequestMiddleware(addProjectMemberRequestValidationSchema),
   projectController.addMember,
+);
+
+projectRegistry.registerPath({
+  method: "get",
+  path: "/project/{projectId}/members",
+  tags: ["Projects"],
+  request: getProjectMembersRequestSchema,
+  responses: createApiResponse(
+    projectMembersResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.get(
+  "/:projectId/members",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(ProjectPermissions.VIEW_PROJECT),
+  validateRequestMiddleware(getProjectMembersRequestValidationSchema),
+  projectController.getProjectMembers,
+);
+
+projectRegistry.registerPath({
+  method: "patch",
+  path: "/project/{projectId}/members/{memberId}",
+  tags: ["Projects"],
+  request: updateProjectMemberRequestSchema,
+  responses: createApiResponse(
+    projectMemberResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.patch(
+  "/:projectId/members/:memberId",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(
+    ProjectPermissions.UPDATE_ROLE_MEMBER_PROJECT,
+  ),
+  validateRequestMiddleware(updateProjectMemberRequestValidationSchema),
+  projectController.updateProjectMember,
+);
+
+projectRegistry.registerPath({
+  method: "delete",
+  path: "/project/{projectId}/members/{memberId}",
+  tags: ["Projects"],
+  request: deleteProjectMemberRequestSchema,
+  responses: createApiResponse(
+    projectMemberResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.delete(
+  "/:projectId/members/:memberId",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyProjectPermission(
+    ProjectPermissions.REMOVE_MEMBER_PROJECT,
+  ),
+  validateRequestMiddleware(deleteProjectMemberRequestValidationSchema),
+  projectController.removeProjectMember,
 );
 
 export const projectRouter = router;

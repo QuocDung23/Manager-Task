@@ -21,6 +21,46 @@ type ProjectWithMembersResult = Prisma.projectsGetPayload<{
 export class ProjectsRepository {
   constructor(private readonly prismaService = new PrismaService()) {}
 
+  private getAccessibleProjectsWhere({
+    userId,
+    name,
+    status,
+  }: {
+    userId: string;
+    name?: string;
+    status?: ProjectStatus;
+  }): Prisma.projectsWhereInput {
+    const whereCondition: Prisma.projectsWhereInput = {
+      status,
+      deletedAt: null,
+      OR: [
+        { userId },
+        {
+          projectMembers: {
+            some: {
+              userId,
+              status: ProjectMemberStatus.ACTIVE,
+              deletedAt: null,
+            },
+          },
+        },
+      ],
+    };
+
+    if (name) {
+      whereCondition.AND = [
+        {
+          OR: [
+            { name: { contains: name } },
+            { description: { contains: name } },
+          ],
+        },
+      ];
+    }
+
+    return whereCondition;
+  }
+
   async createProject({
     project,
   }: {
@@ -47,32 +87,11 @@ export class ProjectsRepository {
     skip: number;
     take: number;
   }): Promise<[ProjectWithMembersResult[], number]> {
-    const whereCondition: Prisma.projectsWhereInput = {
+    const whereCondition = this.getAccessibleProjectsWhere({
+      userId,
+      name,
       status,
-      deletedAt: { equals: null },
-      OR: [
-        { userId },
-        {
-          projectMembers: {
-            some: {
-              userId,
-              status: ProjectMemberStatus.ACTIVE,
-              deletedAt: null,
-            },
-          },
-        },
-      ],
-    };
-    if (name) {
-      whereCondition.AND = [
-        {
-          OR: [
-            { name: { contains: name } },
-            { description: { contains: name } },
-          ],
-        },
-      ];
-    }
+    });
 
     return Promise.all([
       this.prismaService.projects.findMany({
@@ -102,6 +121,21 @@ export class ProjectsRepository {
       }),
     ]);
   }
+
+  async countProjects({
+    userId,
+    name,
+    status,
+  }: {
+    userId: string;
+    name?: string;
+    status?: ProjectStatus;
+  }): Promise<number> {
+    return this.prismaService.projects.count({
+      where: this.getAccessibleProjectsWhere({ userId, name, status }),
+    });
+  }
+
   async getProject({
     id,
     name,

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   HttpResponseBodySuccessDto,
   InternalServerException,
   NotFoundException,
@@ -9,8 +10,11 @@ import {
 import {
   AddProjectMemberRequestDto,
   CreateProjectRequestDto,
+  ProjectCountResponseDto,
   ProjectMemberResponseDto,
+  ProjectMembersResponseDto,
   ProjectResponseDto,
+  UpdateProjectMemberRequestDto,
 } from "./dtos";
 import { ProjectsRepository } from "./projects.repository";
 import { Exception } from "@tsed/exceptions";
@@ -80,6 +84,21 @@ export class ProjectsService {
         paginationUtils.convertPaginationResponseDtoFromTotalRecords(
           totalProjects,
         ),
+    };
+  }
+
+  async countProjects(
+    getAllProjects: GetAllProjectRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<ProjectCountResponseDto>> {
+    const totalProjects = await this.projectsRepository.countProjects({
+      userId: getAllProjects.userId as string,
+      name: getAllProjects.name,
+      status: getAllProjects.status,
+    });
+
+    return {
+      success: true,
+      data: new ProjectCountResponseDto(totalProjects),
     };
   }
 
@@ -227,7 +246,110 @@ export class ProjectsService {
 
     return {
       success: true,
-      data: new ProjectMemberResponseDto(member as any),
+      data: new ProjectMemberResponseDto(member),
+    };
+  }
+
+  async getProjectMembers(
+    projectId: string,
+  ): Promise<HttpResponseBodySuccessDto<ProjectMembersResponseDto>> {
+    const project = await this.projectsRepository.getProject({ id: projectId });
+    if (!project) {
+      throw new NotFoundException("Project not found");
+    }
+
+    const members =
+      await this.projectMemberRepository.getProjectMembers(projectId);
+
+    const memberResponses = members.map(
+      (member) => new ProjectMemberResponseDto(member),
+    );
+
+    return {
+      success: true,
+      data: new ProjectMembersResponseDto(memberResponses),
+    };
+  }
+
+  async updateProjectMember(
+    projectId: string,
+    memberId: string,
+    updateMemberDto: UpdateProjectMemberRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
+    const project = await this.projectsRepository.getProject({ id: projectId });
+    if (!project) {
+      throw new NotFoundException("Project not found");
+    }
+
+    const member = await this.projectMemberRepository.getProjectMemberById(
+      projectId,
+      memberId,
+    );
+    if (!member) {
+      throw new NotFoundException("Project member not found");
+    }
+
+    const role = await this.rolesRepository.findRoleById(
+      updateMemberDto.roleId,
+    );
+    if (
+      !role ||
+      !Object.values(ProjectRole).includes(role.name as ProjectRole)
+    ) {
+      throw new NotFoundException("Project role not found");
+    }
+
+    if (
+      member.userId === project.userId &&
+      role.name !== ProjectRole.PROJECT_ADMIN
+    ) {
+      throw new ForbiddenException("Project owner role cannot be changed");
+    }
+
+    const updatedMember =
+      await this.projectMemberRepository.updateProjectMemberRole(
+        projectId,
+        memberId,
+        role.id,
+      );
+
+    return {
+      success: true,
+      data: new ProjectMemberResponseDto(updatedMember),
+    };
+  }
+
+  async removeProjectMember(
+    projectId: string,
+    memberId: string,
+  ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
+    const project = await this.projectsRepository.getProject({ id: projectId });
+    if (!project) {
+      throw new NotFoundException("Project not found");
+    }
+
+    const member = await this.projectMemberRepository.getProjectMemberById(
+      projectId,
+      memberId,
+    );
+    if (!member) {
+      throw new NotFoundException("Project member not found");
+    }
+
+    if (member.userId === project.userId) {
+      throw new ForbiddenException("Project owner cannot be removed");
+    }
+
+    const removedMember =
+      await this.projectMemberRepository.removeProjectMember(
+        projectId,
+        memberId,
+        member.userId,
+      );
+
+    return {
+      success: true,
+      data: new ProjectMemberResponseDto(removedMember),
     };
   }
 }

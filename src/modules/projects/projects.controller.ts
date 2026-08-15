@@ -3,7 +3,11 @@ import { ProjectsService } from "./projects.service";
 import { GetProjectRequestDto } from "./dtos/request/getProject.req";
 import { Exception } from "@tsed/exceptions";
 import { HttpResponseDto, PaginationDto } from "@/common";
-import { AddProjectMemberRequestDto, CreateProjectRequestDto } from "./dtos";
+import {
+  AddProjectMemberRequestDto,
+  CreateProjectRequestDto,
+  UpdateProjectMemberRequestDto,
+} from "./dtos";
 import { GetAllProjectRequestDto } from "./dtos/request/getAllProject.req";
 import { UpdateProjectRequestDto } from "./dtos/request/updateProject.req";
 
@@ -41,6 +45,21 @@ export class ProjectController {
     return new HttpResponseDto().success(res, result);
   }
 
+  async countProjects(req: Request, res: Response): Promise<Response> {
+    const user = (req as any).user;
+    const getAllProject = new GetAllProjectRequestDto({
+      ...(req.query as any),
+      userId: user.id,
+    } as GetAllProjectRequestDto);
+    const result = await this.projectService.countProjects(getAllProject);
+
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+
+    return new HttpResponseDto().success(res, result);
+  }
+
   async createProject(req: Request, res: Response): Promise<Response> {
     const user = (req as any).user;
 
@@ -54,7 +73,7 @@ export class ProjectController {
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
-    return new HttpResponseDto().success(res, result);
+    return new HttpResponseDto().created(res, result);
   }
 
   async updateProject(req: Request, res: Response): Promise<Response> {
@@ -102,7 +121,49 @@ export class ProjectController {
       return new HttpResponseDto().exception(res, result);
     }
 
+    return new HttpResponseDto().created(res, result);
+  }
+
+  async getProjectMembers(req: Request, res: Response): Promise<Response> {
+    const { projectId } = req.params;
+    const result = await this.projectService.getProjectMembers(
+      projectId as string,
+    );
+
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async updateProjectMember(req: Request, res: Response): Promise<Response> {
+    const { projectId, memberId } = req.params;
+    const updateMemberDto = new UpdateProjectMemberRequestDto(req.body as any);
+    const result = await this.projectService.updateProjectMember(
+      projectId as string,
+      memberId as string,
+      updateMemberDto,
+    );
+
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async removeProjectMember(req: Request, res: Response): Promise<Response> {
+    const { projectId, memberId } = req.params;
+    const result = await this.projectService.removeProjectMember(
+      projectId as string,
+      memberId as string,
+    );
+
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+
     return new HttpResponseDto().success(res, result);
   }
 }
-

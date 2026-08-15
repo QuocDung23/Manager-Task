@@ -1,4 +1,9 @@
-import { RoleStatus, PermissionStatus } from "@prisma/client";
+import {
+  BoardMemberStatus,
+  PermissionStatus,
+  ProjectMemberStatus,
+  RoleStatus,
+} from "@prisma/client";
 import { PrismaService } from "../data/prisma.client";
 import { UserRole } from "@/common/enums/roles/user.role";
 
@@ -45,8 +50,26 @@ export class PermissionRepository {
   ): Promise<boolean> {
     const memberRelation =
       scope === "project"
-        ? { projectMembers: { some: { userId, projectId: scopeId } } }
-        : { boardMembers: { some: { userId, boardId: scopeId } } };
+        ? {
+            projectMembers: {
+              some: {
+                userId,
+                projectId: scopeId,
+                status: ProjectMemberStatus.ACTIVE,
+                deletedAt: null,
+              },
+            },
+          }
+        : {
+            boardMembers: {
+              some: {
+                userId,
+                boardId: scopeId,
+                status: BoardMemberStatus.ACTIVE,
+                deletedAt: null,
+              },
+            },
+          };
 
     const check = await this.prismaService.rolePermissions.findFirst({
       where: {
