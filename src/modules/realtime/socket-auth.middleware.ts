@@ -35,9 +35,13 @@ export const socketAuthMiddleware = (
   ): Promise<void> => {
     try {
       // 1. lấy token từ handshake
-      const authToken = (socket.handshake.auth as any)?.token as
-        | string
+      const handshakeAuth = socket.handshake.auth as
+        | Record<string, unknown>
         | undefined;
+      const authToken =
+        typeof handshakeAuth?.token === "string"
+          ? handshakeAuth.token
+          : undefined;
       const cookieHeader = socket.handshake.headers.cookie;
       const cookieToken = cookieHeader
         ?.split("; ")
@@ -56,14 +60,14 @@ export const socketAuthMiddleware = (
           token,
           jwtConfig.secretAccessToken as string,
         ) as ITokenPayload;
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (err instanceof TokenExpiredError) {
           return next(new Error("Access token expired"));
         }
         if (err instanceof JsonWebTokenError) {
           return next(new Error("Invalid access token"));
         }
-        return next(err);
+        return next(err instanceof Error ? err : new Error("Token verification failed"));
       }
 
       // 3. user phải active

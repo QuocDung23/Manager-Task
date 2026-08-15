@@ -9,7 +9,8 @@ import {
   userRoom,
 } from "./realtime.types";
 import { socketAuthMiddleware } from "./socket-auth.middleware";
-import { registerTaskCommentHandlers } from "./task-comment.socket";
+import { registerTaskRoomHandlers } from "./task-room.socket";
+import { registerBoardRoomHandlers } from "./board-room.socket";
 import { realtimeEventService } from "./realtime-event.service";
 
 export type AppSocketServer = Server<
@@ -61,7 +62,8 @@ export const initSocketServer = (
 
   io.on("connection", (socket) => {
     socket.join(userRoom(socket.data.user.id));
-    registerTaskCommentHandlers(io, socket);
+    registerTaskRoomHandlers(io, socket);
+    registerBoardRoomHandlers(io, socket);
   });
 
   ioInstance = io;

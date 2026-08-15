@@ -28,6 +28,7 @@ import {
 } from "./dtos/response";
 import { TaskResponseDto } from "../dtos/response";
 import { TaskTagRepository } from "./tag.repository";
+import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
 
 const DEFAULT_TAG_COLOR = "#64748b";
 
@@ -135,6 +136,7 @@ export class TaskTagService {
 
   async createTag(
     dto: CreateTagRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TagResponseDto> | Exception> {
     await this.getActiveBoardOrThrow(dto.boardId);
 
@@ -165,14 +167,17 @@ export class TaskTagService {
           color,
         });
 
+    const response = new TagResponseDto(tag);
+    realtimeEventService.emitBoardTagCreated(dto.boardId, response, actorUserId);
     return {
       success: true,
-      data: new TagResponseDto(tag),
+      data: response,
     };
   }
 
   async updateTag(
     dto: UpdateTagRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TagResponseDto> | Exception> {
     const current = await this.getActiveTagInBoardOrThrow({
       boardId: dto.boardId,
@@ -206,14 +211,17 @@ export class TaskTagService {
       data: updateData,
     });
 
+    const response = new TagResponseDto(updated);
+    realtimeEventService.emitBoardTagUpdated(dto.boardId, response, actorUserId);
     return {
       success: true,
-      data: new TagResponseDto(updated),
+      data: response,
     };
   }
 
   async deleteTag(
     dto: DeleteTagRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TagResponseDto> | Exception> {
     const tag = await this.getActiveTagInBoardOrThrow({
       boardId: dto.boardId,
@@ -222,14 +230,17 @@ export class TaskTagService {
 
     const deleted = await this.tagRepository.softDeleteTagWithTaskTags(tag.id);
 
+    const response = new TagResponseDto(deleted);
+    realtimeEventService.emitBoardTagDeleted(dto.boardId, response, actorUserId);
     return {
       success: true,
-      data: new TagResponseDto(deleted),
+      data: response,
     };
   }
 
   async replaceTaskTags(
     dto: ReplaceTaskTagsRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const uniqueTagIds = Array.from(new Set(dto.tagIds));
     if (uniqueTagIds.length !== dto.tagIds.length) {
@@ -253,14 +264,22 @@ export class TaskTagService {
       throw new NotFoundException("Task not found");
     }
 
+    const response = this.toTaskResponse(updated);
+    realtimeEventService.emitTaskTagsUpdated({
+      boardId: ctx.boardId,
+      taskId: ctx.taskId,
+      task: response,
+      actorId: actorUserId,
+    });
     return {
       success: true,
-      data: this.toTaskResponse(updated),
+      data: response,
     };
   }
 
   async attachTaskTag(
     dto: AttachTaskTagRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
     this.assertTaskNotLocked(ctx, "changing task tags");
@@ -277,14 +296,22 @@ export class TaskTagService {
       throw new NotFoundException("Task not found");
     }
 
+    const response = this.toTaskResponse(updated);
+    realtimeEventService.emitTaskTagsUpdated({
+      boardId: ctx.boardId,
+      taskId: ctx.taskId,
+      task: response,
+      actorId: actorUserId,
+    });
     return {
       success: true,
-      data: this.toTaskResponse(updated),
+      data: response,
     };
   }
 
   async detachTaskTag(
     dto: DetachTaskTagRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
     this.assertTaskNotLocked(ctx, "changing task tags");
@@ -309,9 +336,16 @@ export class TaskTagService {
       throw new NotFoundException("Task not found");
     }
 
+    const response = this.toTaskResponse(updated);
+    realtimeEventService.emitTaskTagsUpdated({
+      boardId: ctx.boardId,
+      taskId: ctx.taskId,
+      task: response,
+      actorId: actorUserId,
+    });
     return {
       success: true,
-      data: this.toTaskResponse(updated),
+      data: response,
     };
   }
 

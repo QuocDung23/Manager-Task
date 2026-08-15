@@ -341,6 +341,7 @@ model tasks {
   list         lists            @relation(fields: [listId], references: [id])
   status       TaskStatus       @default(ACTIVE)
   statusAction TaskStatusAction @default(TODO)
+  tagVersion   Int              @default(0) @map("tag_version")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")

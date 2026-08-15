@@ -162,6 +162,11 @@ export class TaskTagRepository {
         });
       }
 
+      await tx.tasks.update({
+        where: { id: args.taskId },
+        data: { tagVersion: { increment: 1 } },
+      });
+
       return tx.tasks.findFirst({
         where: {
           id: args.taskId,
@@ -181,6 +186,11 @@ export class TaskTagRepository {
         tx,
         taskId: args.taskId,
         tagId: args.tagId,
+      });
+
+      await tx.tasks.update({
+        where: { id: args.taskId },
+        data: { tagVersion: { increment: 1 } },
       });
 
       return tx.tasks.findFirst({
@@ -223,6 +233,11 @@ export class TaskTagRepository {
         data: {
           deletedAt: new Date(),
         },
+      });
+
+      await tx.tasks.update({
+        where: { id: args.taskId },
+        data: { tagVersion: { increment: 1 } },
       });
 
       return tx.tasks.findFirst({

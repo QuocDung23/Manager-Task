@@ -4,7 +4,15 @@ import { TaskLockStatus } from "@prisma/client";
 
 export type RealtimeAck = {
   success: boolean;
+  code?: "INVALID_ID" | "NOT_FOUND" | "FORBIDDEN" | "INTERNAL_ERROR";
   error?: string;
+};
+
+export type RealtimeEnvelope<T> = {
+  eventId: string;
+  occurredAt: Date;
+  actorId: string | null;
+  data: T;
 };
 
 export type ClientToServerEvents = {
@@ -14,6 +22,14 @@ export type ClientToServerEvents = {
   ) => void;
   "task:leave": (
     payload: { taskId: string },
+    ack?: (res: RealtimeAck) => void,
+  ) => void;
+  "board:join": (
+    payload: { boardId: string },
+    ack?: (res: RealtimeAck) => void,
+  ) => void;
+  "board:leave": (
+    payload: { boardId: string },
     ack?: (res: RealtimeAck) => void,
   ) => void;
 };
@@ -72,6 +88,17 @@ export type TaskOverdueLockedPayload = {
   lockStatus: TaskLockStatus;
 };
 
+export type TaskTagsUpdatedPayload = RealtimeEnvelope<{
+  boardId: string;
+  taskId: string;
+  task: TaskResponseDto;
+}>;
+
+export type BoardTagPayload = RealtimeEnvelope<{
+  boardId: string;
+  tag: import("@/modules/tasks/tag/dtos/response").TagResponseDto;
+}>;
+
 export type UserNotificationPayload = {
   type:
     | "TASK_DUE_SOON"
@@ -97,6 +124,10 @@ export type ServerToClientEvents = {
   "task:overdue_locked": (payload: TaskOverdueLockedPayload) => void;
   "task:rescheduled": (payload: TaskScheduleUpdatedPayload) => void;
   "task:unlocked": (payload: TaskScheduleUpdatedPayload) => void;
+  "task:tags_updated": (payload: TaskTagsUpdatedPayload) => void;
+  "board:tag_created": (payload: BoardTagPayload) => void;
+  "board:tag_updated": (payload: BoardTagPayload) => void;
+  "board:tag_deleted": (payload: BoardTagPayload) => void;
   "notification:new": (payload: UserNotificationPayload) => void;
 };
 
@@ -112,4 +143,5 @@ export type SocketData = {
 };
 
 export const taskRoom = (taskId: string) => `task:${taskId}`;
+export const boardRoom = (boardId: string) => `board:${boardId}`;
 export const userRoom = (userId: string) => `user:${userId}`;

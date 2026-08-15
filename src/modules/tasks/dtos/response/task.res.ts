@@ -59,6 +59,7 @@ export class TaskResponseDto {
   tags: TaskTagSummaryDto[];
   status: TaskStatus;
   statusAction: TaskStatusAction;
+  tagVersion: number;
 
   createdAt: Date;
   updatedAt: Date;
@@ -85,6 +86,7 @@ export class TaskResponseDto {
     this.listId = data.listId;
     this.status = data.status;
     this.statusAction = data.statusAction;
+    this.tagVersion = data.tagVersion ?? 0;
     this.isLocked = this.lockStatus !== TaskLockStatus.UNLOCKED;
     this.isOverdue =
       this.dueDate !== null &&
@@ -183,6 +185,7 @@ export const taskResponseSchema = z.object({
   tags: z.array(taskTagSummarySchema),
   status: z.enum(TaskStatus),
   statusAction: z.enum(TaskStatusAction),
+  tagVersion: z.number().int().nonnegative(),
 
   createdAt: z.date(),
   updatedAt: z.date(),

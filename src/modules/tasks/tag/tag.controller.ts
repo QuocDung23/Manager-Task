@@ -16,9 +16,14 @@ import { TaskTagService } from "./tag.service";
 export class TaskTagController {
   constructor(private readonly taskTagService = new TaskTagService()) {}
 
+  private getActorUserId(req: Request): string | undefined {
+    const user = (req as Request & { user?: { id?: unknown } }).user;
+    return typeof user?.id === "string" ? user.id : undefined;
+  }
+
   async getTags(req: Request, res: Response): Promise<Response> {
     const dto = new GetTagsRequestDto({
-      ...(req.query as any),
+      ...(req.query as Record<string, unknown>),
       boardId: req.params.boardId,
     } as GetTagsRequestDto);
 
@@ -31,11 +36,11 @@ export class TaskTagController {
 
   async createTag(req: Request, res: Response): Promise<Response> {
     const dto = new CreateTagRequestDto({
-      ...(req.body as any),
+      ...(req.body as Record<string, unknown>),
       boardId: req.params.boardId,
     } as CreateTagRequestDto);
 
-    const result = await this.taskTagService.createTag(dto);
+    const result = await this.taskTagService.createTag(dto, this.getActorUserId(req));
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
@@ -44,12 +49,12 @@ export class TaskTagController {
 
   async updateTag(req: Request, res: Response): Promise<Response> {
     const dto = new UpdateTagRequestDto({
-      ...(req.body as any),
+      ...(req.body as Record<string, unknown>),
       boardId: req.params.boardId,
       tagId: req.params.tagId,
     } as UpdateTagRequestDto);
 
-    const result = await this.taskTagService.updateTag(dto);
+    const result = await this.taskTagService.updateTag(dto, this.getActorUserId(req));
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
@@ -62,7 +67,7 @@ export class TaskTagController {
       tagId: req.params.tagId,
     } as DeleteTagRequestDto);
 
-    const result = await this.taskTagService.deleteTag(dto);
+    const result = await this.taskTagService.deleteTag(dto, this.getActorUserId(req));
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
@@ -71,11 +76,11 @@ export class TaskTagController {
 
   async replaceTaskTags(req: Request, res: Response): Promise<Response> {
     const dto = new ReplaceTaskTagsRequestDto({
-      ...(req.body as any),
+      ...(req.body as Record<string, unknown>),
       taskId: req.params.taskId,
     } as ReplaceTaskTagsRequestDto);
 
-    const result = await this.taskTagService.replaceTaskTags(dto);
+    const result = await this.taskTagService.replaceTaskTags(dto, this.getActorUserId(req));
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
@@ -88,7 +93,7 @@ export class TaskTagController {
       tagId: req.params.tagId,
     } as AttachTaskTagRequestDto);
 
-    const result = await this.taskTagService.attachTaskTag(dto);
+    const result = await this.taskTagService.attachTaskTag(dto, this.getActorUserId(req));
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
@@ -101,7 +106,7 @@ export class TaskTagController {
       tagId: req.params.tagId,
     } as DetachTaskTagRequestDto);
 
-    const result = await this.taskTagService.detachTaskTag(dto);
+    const result = await this.taskTagService.detachTaskTag(dto, this.getActorUserId(req));
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }
@@ -110,7 +115,7 @@ export class TaskTagController {
 
   async getTasksByTag(req: Request, res: Response): Promise<Response> {
     const dto = new GetTasksByTagRequestDto({
-      ...(req.query as any),
+      ...(req.query as Record<string, unknown>),
       boardId: req.params.boardId,
       tagId: req.params.tagId,
     } as GetTasksByTagRequestDto);
