@@ -415,7 +415,8 @@ export class TaskRepository {
    *  2. Với từng userId trong `userIds`:
    *     - nếu đã có record (kể cả đã soft delete) → update deletedAt = null, đồng thời set assignedById.
    *     - nếu chưa có → create mới.
-   *  3. Trả về task active kèm các assignment active (không bao gồm bản ghi đã soft delete).
+   *  3. Increment `assignmentVersion` trên task.
+   *  4. Trả về task active kèm các assignment active (không bao gồm bản ghi đã soft delete).
    */
   async replaceTaskAssignments(
     taskId: string,
@@ -470,7 +471,13 @@ export class TaskRepository {
         }
       }
 
-      // 3. trả task + assignment active
+      // 3. increment assignmentVersion
+      await tx.tasks.update({
+        where: { id: taskId },
+        data: { assignmentVersion: { increment: 1 } },
+      });
+
+      // 4. trả task + assignment active
       return tx.tasks.findFirst({
         where: {
           id: taskId,
@@ -922,6 +929,7 @@ export class TaskRepository {
   /**
    * Soft delete 1 assignment (taskId, userId) nếu đang active.
    * Trả về task active kèm assignment active sau khi xoá.
+   * Trong cùng transaction: soft-delete + increment assignmentVersion + query canonical.
    */
   async removeTaskAssignment(
     taskId: string,
@@ -937,6 +945,12 @@ export class TaskRepository {
         data: {
           deletedAt: new Date(),
         },
+      });
+
+      // increment assignmentVersion
+      await tx.tasks.update({
+        where: { id: taskId },
+        data: { assignmentVersion: { increment: 1 } },
       });
 
       return tx.tasks.findFirst({

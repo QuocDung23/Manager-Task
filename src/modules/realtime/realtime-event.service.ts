@@ -9,6 +9,7 @@ import {
   TaskOverdueLockedPayload,
   UserNotificationPayload,
   userRoom,
+  TaskAssignmentsUpdatedPayload,
 } from "./realtime.types";
 import type { AppSocketServer } from "./socket.server";
 import { createRealtimeEnvelope } from "./realtime-envelope";
@@ -146,6 +147,32 @@ export class RealtimeEventService {
         .emit("task:tags_updated", payload);
     } catch (error) {
       console.error("[realtime] task tag event publish failed", {
+        taskId: args.taskId,
+        boardId: args.boardId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitTaskAssignmentsUpdated(args: {
+    boardId: string;
+    taskId: string;
+    task: TaskResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: TaskAssignmentsUpdatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { boardId: args.boardId, taskId: args.taskId, task: args.task },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(taskRoom(args.taskId))
+        .to(boardRoom(args.boardId))
+        .emit("task:assignments_updated", payload);
+    } catch (error) {
+      console.error("[realtime] task assignments event publish failed", {
         taskId: args.taskId,
         boardId: args.boardId,
         eventId: payload.eventId,

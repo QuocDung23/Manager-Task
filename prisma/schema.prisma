@@ -342,6 +342,7 @@ model tasks {
   status       TaskStatus       @default(ACTIVE)
   statusAction TaskStatusAction @default(TODO)
   tagVersion   Int              @default(0) @map("tag_version")
+  assignmentVersion Int            @default(0) @map("assignment_version")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")

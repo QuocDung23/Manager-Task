@@ -112,12 +112,17 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         payloadRefreshToken.userId,
       );
       if (!savedToken || savedToken.refreshToken !== refreshToken) {
-        throw new UnauthorizedException("refresh token is invalid");
+        throw new UnauthorizedException("refresh token is invalid or expired");
       }
 
-      if (accessToken) {
+      const authHeader = req.headers.authorization;
+      const headerToken = authHeader?.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : undefined;
+      const cookieAccessToken = headerToken ?? accessToken;
+      if (cookieAccessToken) {
         const payloadAccessToken: ITokenPayload = verify(
-          accessToken,
+          cookieAccessToken,
           jwtConfig.secretAccessToken as string,
           {
             ignoreExpiration: true,
@@ -128,12 +133,12 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
           throw new UnauthorizedException("token pair mismatch");
         }
 
-        if (payloadAccessToken.exp > Date.now() / 1000) {
-          throw new OptionalException(
-            StatusCodes.CONFLICT,
-            "accesstoken has not expired yet",
-          );
-        }
+        // if (payloadAccessToken.exp > Date.now() / 1000) {
+        //   throw new OptionalException(
+        //     StatusCodes.CONFLICT,
+        //     "accesstoken has not expired yet",
+        //   );
+        // }
       }
 
       const userData = await this.userRepository.findUser({
@@ -201,9 +206,9 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
           throw new UnauthorizedException("Unverified");
         }
 
-        const projectId = (req.params.projectId ||
-          req.body.projectId ||
-          req.query.projectId) as string;
+        const projectId = (req.params?.projectId ||
+          req.body?.projectId ||
+          req.query?.projectId) as string;
 
         if (!projectId) {
           throw new NotFoundException("Project Not Found");

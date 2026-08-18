@@ -130,7 +130,10 @@ export class TaskController {
       userId,
     } as UnassignTaskRequestDto);
 
-    const result = await this.taskService.unassignTask(unassignTaskDto);
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
+
+    const result = await this.taskService.unassignTask(unassignTaskDto, actorUserId);
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }

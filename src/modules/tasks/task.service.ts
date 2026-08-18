@@ -536,14 +536,25 @@ export class TaskService {
       throw new NotFoundException("Task not found");
     }
 
+    const response = this.toTaskResponse(updatedTask);
+
+    // 4. emit realtime event sau commit
+    realtimeEventService.emitTaskAssignmentsUpdated({
+      boardId,
+      taskId,
+      task: response,
+      actorId: actorUserId,
+    });
+
     return {
       success: true,
-      data: this.toTaskResponse(updatedTask),
+      data: response,
     };
   }
 
   async unassignTask(
     unassignTaskDto: UnassignTaskRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const { taskId, userId } = unassignTaskDto;
 
@@ -563,6 +574,9 @@ export class TaskService {
       throw new NotFoundException("Task assignment not found");
     }
 
+    // resolve boardId từ task -> list
+    const boardId = await this.resolveBoardIdByTaskId(taskId);
+
     const updatedTask = await this.taskRepository.removeTaskAssignment(
       taskId,
       userId,
@@ -571,9 +585,19 @@ export class TaskService {
       throw new NotFoundException("Task not found");
     }
 
+    const response = this.toTaskResponse(updatedTask);
+
+    // emit realtime event sau commit
+    realtimeEventService.emitTaskAssignmentsUpdated({
+      boardId,
+      taskId,
+      task: response,
+      actorId: actorUserId,
+    });
+
     return {
       success: true,
-      data: this.toTaskResponse(updatedTask),
+      data: response,
     };
   }
 

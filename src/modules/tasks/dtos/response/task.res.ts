@@ -60,6 +60,7 @@ export class TaskResponseDto {
   status: TaskStatus;
   statusAction: TaskStatusAction;
   tagVersion: number;
+  assignmentVersion: number;
 
   createdAt: Date;
   updatedAt: Date;
@@ -87,6 +88,7 @@ export class TaskResponseDto {
     this.status = data.status;
     this.statusAction = data.statusAction;
     this.tagVersion = data.tagVersion ?? 0;
+    this.assignmentVersion = (data as TaskResponseDto).assignmentVersion ?? 0;
     this.isLocked = this.lockStatus !== TaskLockStatus.UNLOCKED;
     this.isOverdue =
       this.dueDate !== null &&
@@ -186,6 +188,7 @@ export const taskResponseSchema = z.object({
   status: z.enum(TaskStatus),
   statusAction: z.enum(TaskStatusAction),
   tagVersion: z.number().int().nonnegative(),
+  assignmentVersion: z.number().int().nonnegative(),
 
   createdAt: z.date(),
   updatedAt: z.date(),

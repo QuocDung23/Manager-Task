@@ -94,6 +94,12 @@ export type TaskTagsUpdatedPayload = RealtimeEnvelope<{
   task: TaskResponseDto;
 }>;
 
+export type TaskAssignmentsUpdatedPayload = RealtimeEnvelope<{
+  boardId: string;
+  taskId: string;
+  task: TaskResponseDto;
+}>;
+
 export type BoardTagPayload = RealtimeEnvelope<{
   boardId: string;
   tag: import("@/modules/tasks/tag/dtos/response").TagResponseDto;
@@ -125,6 +131,7 @@ export type ServerToClientEvents = {
   "task:rescheduled": (payload: TaskScheduleUpdatedPayload) => void;
   "task:unlocked": (payload: TaskScheduleUpdatedPayload) => void;
   "task:tags_updated": (payload: TaskTagsUpdatedPayload) => void;
+  "task:assignments_updated": (payload: TaskAssignmentsUpdatedPayload) => void;
   "board:tag_created": (payload: BoardTagPayload) => void;
   "board:tag_updated": (payload: BoardTagPayload) => void;
   "board:tag_deleted": (payload: BoardTagPayload) => void;
