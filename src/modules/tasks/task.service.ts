@@ -158,6 +158,16 @@ export class TaskService {
       this.assertValidSchedule(createTaskDto.dueDate, createTaskDto.reminderAt);
     }
 
+    // Resolve boardId from server-side list data
+    const list = await this.listRepository.getListById(createTaskDto.listId);
+    if (!list) {
+      throw new NotFoundException("List not found");
+    }
+    if (list.deletedAt !== null) {
+      throw new NotFoundException("List is deleted");
+    }
+    const boardId = list.boardId;
+
     // chọn 65536 vì nó = 2^16 đủ lớn để có thể drag drop ổn định
     const orderTask =
       (await this.taskRepository.getMaxOrderTask(createTaskDto.listId)) + 65536;
@@ -188,6 +198,14 @@ export class TaskService {
     const response = taskWithAssignments
       ? this.toTaskResponse(taskWithAssignments)
       : this.toTaskResponse(createTask as TaskWithAssignments);
+
+    // Emit task:created to board room after DB commit
+    realtimeEventService.emitTaskCreated({
+      boardId,
+      listId: createTaskDto.listId,
+      task: response,
+      actorId: actorUserId,
+    });
 
     if (createTaskDto.dueDate) {
       realtimeEventService.emitTaskScheduleUpdated(createTask.id, response);

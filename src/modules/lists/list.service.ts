@@ -14,6 +14,7 @@ import { GetListByIdRequestDto } from "./dtos/requests/getListById.req";
 import { UpdateListRequestDto } from "./dtos/requests/updateList.req";
 import { DeleteListRequestDto } from "./dtos/requests/delete.req";
 import { ReorderListRequestDto } from "./dtos/requests/reorderList.req";
+import { realtimeEventService } from "@/modules/realtime";
 
 export class ListService {
   constructor(
@@ -67,6 +68,7 @@ export class ListService {
 
   async createList(
     createList: CreateListRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<ListResponseDto> | Exception> {
     //chọn 65536 vì nó = 2^16 đủ lớn để có thể drag drop ôn định
     const order =
@@ -80,10 +82,18 @@ export class ListService {
     };
 
     const created = await this.listRepository.createList(data);
+    const response = new ListResponseDto(created as any);
+
+    // Emit list:created to board room after DB commit
+    realtimeEventService.emitListCreated({
+      boardId: createList.boardId,
+      list: response,
+      actorId: actorUserId,
+    });
 
     return {
       success: true,
-      data: new ListResponseDto(created as any),
+      data: response,
     };
   }
 

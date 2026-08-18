@@ -1,4 +1,5 @@
 import { CommentResponseDto } from "@/modules/tasks/comment/dtos/response";
+import { ListResponseDto } from "@/modules/lists/dtos/responses/list.res";
 import { TaskResponseDto } from "@/modules/tasks/dtos/response";
 import {
   boardRoom,
@@ -10,13 +11,18 @@ import {
   UserNotificationPayload,
   userRoom,
   TaskAssignmentsUpdatedPayload,
+  TaskCreatedPayload,
+  ListCreatedPayload,
 } from "./realtime.types";
 import type { AppSocketServer } from "./socket.server";
 import { createRealtimeEnvelope } from "./realtime-envelope";
 import { TagResponseDto } from "@/modules/tasks/tag/dtos/response";
 
 /**
- * Service emit realtime event tới các client đang subscribe.
+ * Service emit realtime event tới 
+  emitTaskCreated(arg0: { boardId: string; listId: string; task: TaskResponseDto; actorId: string | undefined; }) {
+    throw new Error("Method not implemented.");
+  }các client đang subscribe.
  * Lấy io instance qua `setIO()` khi server bootstrap.
  */
 export class RealtimeEventService {
@@ -217,6 +223,52 @@ export class RealtimeEventService {
 
   emitUserNotification(userId: string, notification: UserNotificationPayload) {
     this.emitToUser(userId, "notification:new", notification);
+  }
+
+  emitTaskCreated(args: {
+    boardId: string;
+    listId: string;
+    task: TaskResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: TaskCreatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { boardId: args.boardId, listId: args.listId, task: args.task },
+    });
+    if (!this.io) return;
+    try {
+      this.io.to(boardRoom(args.boardId)).emit("task:created", payload);
+    } catch (error) {
+      console.error("[realtime] task:created event publish failed", {
+        taskId: args.task.id,
+        boardId: args.boardId,
+        listId: args.listId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitListCreated(args: {
+    boardId: string;
+    list: ListResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: ListCreatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { boardId: args.boardId, list: args.list },
+    });
+    if (!this.io) return;
+    try {
+      this.io.to(boardRoom(args.boardId)).emit("list:created", payload);
+    } catch (error) {
+      console.error("[realtime] list:created event publish failed", {
+        listId: args.list.id,
+        boardId: args.boardId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
   }
 }
 

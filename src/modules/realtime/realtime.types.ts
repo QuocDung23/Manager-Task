@@ -1,4 +1,5 @@
 import { CommentResponseDto } from "@/modules/tasks/comment/dtos/response";
+import { ListResponseDto } from "@/modules/lists/dtos/responses/list.res";
 import { TaskResponseDto } from "@/modules/tasks/dtos/response";
 import { TaskLockStatus } from "@prisma/client";
 
@@ -100,6 +101,17 @@ export type TaskAssignmentsUpdatedPayload = RealtimeEnvelope<{
   task: TaskResponseDto;
 }>;
 
+export type TaskCreatedPayload = RealtimeEnvelope<{
+  boardId: string;
+  listId: string;
+  task: TaskResponseDto;
+}>;
+
+export type ListCreatedPayload = RealtimeEnvelope<{
+  boardId: string;
+  list: ListResponseDto;
+}>;
+
 export type BoardTagPayload = RealtimeEnvelope<{
   boardId: string;
   tag: import("@/modules/tasks/tag/dtos/response").TagResponseDto;
@@ -132,6 +144,8 @@ export type ServerToClientEvents = {
   "task:unlocked": (payload: TaskScheduleUpdatedPayload) => void;
   "task:tags_updated": (payload: TaskTagsUpdatedPayload) => void;
   "task:assignments_updated": (payload: TaskAssignmentsUpdatedPayload) => void;
+  "task:created": (payload: TaskCreatedPayload) => void;
+  "list:created": (payload: ListCreatedPayload) => void;
   "board:tag_created": (payload: BoardTagPayload) => void;
   "board:tag_updated": (payload: BoardTagPayload) => void;
   "board:tag_deleted": (payload: BoardTagPayload) => void;

@@ -49,6 +49,8 @@ export class ListController {
 
   async createList(req: Request, res: Response): Promise<Response> {
     const boardId = req.params.boardId as string;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
 
     const payload = {
       ...req.body,
@@ -56,7 +58,7 @@ export class ListController {
     };
 
     const dto = new CreateListRequestDto(payload as CreateListRequestDto);
-    const result = await this.listService.createList(dto);
+    const result = await this.listService.createList(dto, actorUserId);
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
