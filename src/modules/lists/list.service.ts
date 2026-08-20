@@ -140,6 +140,7 @@ export class ListService {
 
   async reorderLists(
     reorderListDto: ReorderListRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<ListResponseDto[]> | Exception> {
     const { boardId, listIds } = reorderListDto;
 
@@ -190,9 +191,19 @@ export class ListService {
 
     const sorted = updatedLists.sort((a, b) => a.order - b.order);
 
+    const response = sorted.map((list) => new ListResponseDto(list as any)) as any;
+
+    // Emit board:lists_reordered tới board room sau DB commit.
+    // Snapshot đã sort theo order canonical; permission đã check ở middleware.
+    realtimeEventService.emitBoardListsReordered({
+      boardId,
+      lists: response,
+      actorId: actorUserId,
+    });
+
     return {
       success: true,
-      data: sorted.map((list) => new ListResponseDto(list as any)) as any,
+      data: response,
     };
   }
 }

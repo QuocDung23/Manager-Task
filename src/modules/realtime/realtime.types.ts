@@ -1,7 +1,7 @@
 import { CommentResponseDto } from "@/modules/tasks/comment/dtos/response";
 import { ListResponseDto } from "@/modules/lists/dtos/responses/list.res";
 import { TaskResponseDto } from "@/modules/tasks/dtos/response";
-import { TaskLockStatus } from "@prisma/client";
+import { TaskLockStatus, TaskStatusAction } from "@prisma/client";
 
 export type RealtimeAck = {
   success: boolean;
@@ -101,6 +101,13 @@ export type TaskAssignmentsUpdatedPayload = RealtimeEnvelope<{
   task: TaskResponseDto;
 }>;
 
+export type TaskStatusActionUpdatedPayload = RealtimeEnvelope<{
+  boardId: string;
+  taskId: string;
+  task: TaskResponseDto;
+  statusAction: TaskStatusAction;
+}>;
+
 export type TaskCreatedPayload = RealtimeEnvelope<{
   boardId: string;
   listId: string;
@@ -110,6 +117,23 @@ export type TaskCreatedPayload = RealtimeEnvelope<{
 export type ListCreatedPayload = RealtimeEnvelope<{
   boardId: string;
   list: ListResponseDto;
+}>;
+
+export type BoardListsReorderedPayload = RealtimeEnvelope<{
+  boardId: string;
+  orderVersion: number;
+  lists: ListResponseDto[];
+}>;
+
+export type BoardTasksReorderedPayload = RealtimeEnvelope<{
+  boardId: string;
+  orderVersion: number;
+  taskId: string;
+  sourceListId: string;
+  targetListId: string;
+  movedTask: TaskResponseDto;
+  sourceTasks: TaskResponseDto[];
+  targetTasks: TaskResponseDto[];
 }>;
 
 export type BoardTagPayload = RealtimeEnvelope<{
@@ -144,8 +168,11 @@ export type ServerToClientEvents = {
   "task:unlocked": (payload: TaskScheduleUpdatedPayload) => void;
   "task:tags_updated": (payload: TaskTagsUpdatedPayload) => void;
   "task:assignments_updated": (payload: TaskAssignmentsUpdatedPayload) => void;
+  "task:status_action_updated": (payload: TaskStatusActionUpdatedPayload) => void;
   "task:created": (payload: TaskCreatedPayload) => void;
   "list:created": (payload: ListCreatedPayload) => void;
+  "board:lists_reordered": (payload: BoardListsReorderedPayload) => void;
+  "board:tasks_reordered": (payload: BoardTasksReorderedPayload) => void;
   "board:tag_created": (payload: BoardTagPayload) => void;
   "board:tag_updated": (payload: BoardTagPayload) => void;
   "board:tag_deleted": (payload: BoardTagPayload) => void;

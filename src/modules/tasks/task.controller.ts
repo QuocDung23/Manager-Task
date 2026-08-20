@@ -84,12 +84,15 @@ export class TaskController {
 
   async moveTask(req: Request, res: Response): Promise<Response> {
     const taskId = req.params.taskId as string;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
+
     const moveTaskDto = new MoveTaskRequestDto({
       ...(req.body as any),
       taskId,
     } as MoveTaskRequestDto);
 
-    const result = await this.taskService.moveTask(moveTaskDto);
+    const result = await this.taskService.moveTask(moveTaskDto, actorUserId);
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }

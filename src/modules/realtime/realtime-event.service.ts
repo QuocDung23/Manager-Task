@@ -3,7 +3,9 @@ import { ListResponseDto } from "@/modules/lists/dtos/responses/list.res";
 import { TaskResponseDto } from "@/modules/tasks/dtos/response";
 import {
   boardRoom,
+  BoardListsReorderedPayload,
   BoardTagPayload,
+  BoardTasksReorderedPayload,
   taskRoom,
   TaskTagsUpdatedPayload,
   TaskDueSoonPayload,
@@ -11,12 +13,29 @@ import {
   UserNotificationPayload,
   userRoom,
   TaskAssignmentsUpdatedPayload,
+  TaskStatusActionUpdatedPayload,
   TaskCreatedPayload,
   ListCreatedPayload,
 } from "./realtime.types";
 import type { AppSocketServer } from "./socket.server";
 import { createRealtimeEnvelope } from "./realtime-envelope";
 import { TagResponseDto } from "@/modules/tasks/tag/dtos/response";
+
+/**
+ * Server-side per-board monotonic counter for reorder mutations.
+ *
+ * Phase 1 của plan: chưa thêm cột `orderVersion` vào schema, nên dùng
+ * counter in-memory theo process. Khi scale BE chạy nhiều instance,
+ * counter sẽ không đồng bộ giữa các node; vẫn đảm bảo "eventId" là
+ * dedupe key chính, còn `orderVersion` chỉ là best-effort local revision.
+ * Khi reconnect, FE refetch toàn bộ board list/task nên sẽ tự hồi phục.
+ */
+const boardOrderRevision = new Map<string, number>();
+function nextBoardRevision(boardId: string): number {
+  const next = (boardOrderRevision.get(boardId) ?? 0) + 1;
+  boardOrderRevision.set(boardId, next);
+  return next;
+}
 
 /**
  * Service emit realtime event tới 
@@ -187,6 +206,39 @@ export class RealtimeEventService {
     }
   }
 
+  emitTaskStatusActionUpdated(args: {
+    boardId: string;
+    taskId: string;
+    task: TaskResponseDto;
+    statusAction: TaskResponseDto["statusAction"];
+    actorId?: string | null;
+  }): void {
+    const payload: TaskStatusActionUpdatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: {
+        boardId: args.boardId,
+        taskId: args.taskId,
+        task: args.task,
+        statusAction: args.statusAction,
+      },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(taskRoom(args.taskId))
+        .to(boardRoom(args.boardId))
+        .emit("task:status_action_updated", payload);
+    } catch (error) {
+      console.error("[realtime] task status action event publish failed", {
+        taskId: args.taskId,
+        boardId: args.boardId,
+        statusAction: args.statusAction,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
   private emitBoardTagEvent(
     event: "board:tag_created" | "board:tag_updated" | "board:tag_deleted",
     boardId: string,
@@ -265,6 +317,70 @@ export class RealtimeEventService {
       console.error("[realtime] list:created event publish failed", {
         listId: args.list.id,
         boardId: args.boardId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitBoardListsReordered(args: {
+    boardId: string;
+    lists: ListResponseDto[];
+    actorId?: string | null;
+  }): void {
+    const payload: BoardListsReorderedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: {
+        boardId: args.boardId,
+        orderVersion: nextBoardRevision(args.boardId),
+        lists: args.lists,
+      },
+    });
+    if (!this.io) return;
+    try {
+      this.io.to(boardRoom(args.boardId)).emit("board:lists_reordered", payload);
+    } catch (error) {
+      console.error("[realtime] board:lists_reordered event publish failed", {
+        boardId: args.boardId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitBoardTasksReordered(args: {
+    boardId: string;
+    taskId: string;
+    sourceListId: string;
+    targetListId: string;
+    movedTask: TaskResponseDto;
+    sourceTasks: TaskResponseDto[];
+    targetTasks: TaskResponseDto[];
+    actorId?: string | null;
+  }): void {
+    const payload: BoardTasksReorderedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: {
+        boardId: args.boardId,
+        orderVersion: nextBoardRevision(args.boardId),
+        taskId: args.taskId,
+        sourceListId: args.sourceListId,
+        targetListId: args.targetListId,
+        movedTask: args.movedTask,
+        sourceTasks: args.sourceTasks,
+        targetTasks: args.targetTasks,
+      },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(boardRoom(args.boardId))
+        .to(taskRoom(args.taskId))
+        .emit("board:tasks_reordered", payload);
+    } catch (error) {
+      console.error("[realtime] board:tasks_reordered event publish failed", {
+        boardId: args.boardId,
+        taskId: args.taskId,
         eventId: payload.eventId,
         error,
       });

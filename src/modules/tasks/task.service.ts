@@ -326,6 +326,7 @@ export class TaskService {
    */
   async moveTask(
     moveTaskDto: MoveTaskRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<MoveTaskResponseDto> | Exception> {
     const { taskId, sourceListId, targetListId, orderedTaskIds } = moveTaskDto;
 
@@ -502,6 +503,20 @@ export class TaskService {
       movedTask: this.toTaskResponse(movedTaskRecord),
       sourceTasks: updatedSourceTasks.map((t) => this.toTaskResponse(t)),
       targetTasks: updatedTargetTasks.map((t) => this.toTaskResponse(t)),
+    });
+
+    // Emit board:tasks_reordered tới board room + task room (cho task detail
+    // đang mở ngoài board) sau DB commit. BoardId resolve từ source list
+    // server-side; permission vẫn do middleware/permission layer đảm nhiệm.
+    realtimeEventService.emitBoardTasksReordered({
+      boardId: sourceList.boardId,
+      taskId,
+      sourceListId,
+      targetListId,
+      movedTask: response.movedTask,
+      sourceTasks: response.sourceTasks,
+      targetTasks: response.targetTasks,
+      actorId: actorUserId,
     });
 
     return {
@@ -935,6 +950,16 @@ export class TaskService {
       throw new NotFoundException("Task not found");
     }
     const response = this.toTaskResponse(taskWithAssignments);
+
+    const boardId = await this.resolveBoardIdByTaskId(dto.taskId);
+
+    realtimeEventService.emitTaskStatusActionUpdated({
+      boardId,
+      taskId: dto.taskId,
+      task: response,
+      statusAction: dto.statusAction,
+      actorId: actorUserId,
+    });
 
     if (dto.statusAction === TaskStatusAction.DONE) {
       realtimeEventService.emitTaskScheduleUpdated(dto.taskId, response);

@@ -95,13 +95,18 @@ export class ListController {
 
   async reorderLists(req: Request, res: Response): Promise<Response> {
     const boardId = req.params.boardId as string;
+    const actor = (req as any).user;
+    const actorUserId: string | undefined = actor?.id;
 
     const reorderListDto = new ReorderListRequestDto({
       ...(req.body as any),
       boardId,
     } as ReorderListRequestDto);
 
-    const result = await this.listService.reorderLists(reorderListDto);
+    const result = await this.listService.reorderLists(
+      reorderListDto,
+      actorUserId,
+    );
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
