@@ -1,13 +1,16 @@
 import { TaskPermissions } from "@/common/enums/permissions";
 import { BoardRepository } from "@/modules/board/board.repository";
+import { ProjectsRepository } from "@/modules/projects/projects.repository";
+import { ProjectPermissions } from "@/common/enums/permissions";
 import { PermissionRepository } from "@/modules/permission/permission.repository";
 import { TaskRepository } from "@/modules/tasks/task.repository";
-import { BoardStatus } from "@prisma/client";
+import { BoardStatus, ProjectStatus } from "@prisma/client";
 
 export type RoomPermissionCode = "INVALID_ID" | "NOT_FOUND" | "FORBIDDEN";
 
 export type RoomPermissionResult =
   | { allowed: true; boardId: string; projectId: string }
+  | { allowed: true; boardId?: undefined; projectId: string }
   | { allowed: false; code: RoomPermissionCode; error: string };
 
 const UUID_REGEX =
@@ -17,6 +20,7 @@ export class RoomPermissionService {
   constructor(
     private readonly boardRepository = new BoardRepository(),
     private readonly taskRepository = new TaskRepository(),
+    private readonly projectsRepository = new ProjectsRepository(),
     private readonly permissionRepository = new PermissionRepository(),
   ) {}
 
@@ -43,6 +47,34 @@ export class RoomPermissionService {
     }
 
     return { allowed: true, boardId: board.id, projectId: board.projectId };
+  }
+
+  async authorizeProject(
+    userId: string,
+    projectId: string,
+  ): Promise<RoomPermissionResult> {
+    if (!UUID_REGEX.test(projectId)) {
+      return { allowed: false, code: "INVALID_ID", error: "Invalid projectId" };
+    }
+
+    const project = await this.projectsRepository.getProject({
+      id: projectId,
+      status: ProjectStatus.ACTIVE,
+    });
+    if (!project) {
+      return { allowed: false, code: "NOT_FOUND", error: "Project not found" };
+    }
+
+    const hasPermission = await this.permissionRepository.checkAnyPermission(
+      userId,
+      [ProjectPermissions.VIEW_PROJECT],
+      { projectId: project.id },
+    );
+    if (!hasPermission) {
+      return { allowed: false, code: "FORBIDDEN", error: "Forbidden" };
+    }
+
+    return { allowed: true, projectId: project.id };
   }
 
   async authorizeTask(

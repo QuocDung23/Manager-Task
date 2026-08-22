@@ -35,13 +35,17 @@ export const registerBoardRoomHandlers = (
 
     try {
       const result = await permissionService.authorizeBoard(socket.data.user.id, boardId);
-      if (!result.allowed) {
+      if (!result.allowed || !result.boardId) {
         console.warn("[realtime] board room join denied", {
           userId: socket.data.user.id,
           boardId,
-          code: result.code,
+          code: !result.allowed ? result.code : undefined,
         });
-        sendAck(ack, { success: false, code: result.code, error: result.error });
+        sendAck(ack, {
+          success: false,
+          code: !result.allowed ? result.code : "INVALID_ID",
+          error: !result.allowed ? result.error : "Board not allowed",
+        });
         return;
       }
 

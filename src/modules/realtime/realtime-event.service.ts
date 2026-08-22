@@ -12,11 +12,20 @@ import {
   TaskOverdueLockedPayload,
   UserNotificationPayload,
   userRoom,
+  projectRoom,
   TaskAssignmentsUpdatedPayload,
   TaskStatusActionUpdatedPayload,
   TaskCreatedPayload,
   ListCreatedPayload,
+  ProjectCreatedPayload,
+  ProjectUpdatedPayload,
+  ProjectDeletedPayload,
+  ProjectMemberAddedPayload,
+  ProjectMemberRemovedPayload,
+  ProjectMemberRoleUpdatedPayload,
 } from "./realtime.types";
+import type { ProjectResponseDto } from "@/modules/projects/dtos/response/project.res";
+import type { ProjectMemberResponseDto } from "@/modules/projects/dtos/response/projectMember.res";
 import type { AppSocketServer } from "./socket.server";
 import { createRealtimeEnvelope } from "./realtime-envelope";
 import { TagResponseDto } from "@/modules/tasks/tag/dtos/response";
@@ -38,10 +47,7 @@ function nextBoardRevision(boardId: string): number {
 }
 
 /**
- * Service emit realtime event tới 
-  emitTaskCreated(arg0: { boardId: string; listId: string; task: TaskResponseDto; actorId: string | undefined; }) {
-    throw new Error("Method not implemented.");
-  }các client đang subscribe.
+ * Service emit realtime event tới các client đang subscribe.
  * Lấy io instance qua `setIO()` khi server bootstrap.
  */
 export class RealtimeEventService {
@@ -384,6 +390,153 @@ export class RealtimeEventService {
         eventId: payload.eventId,
         error,
       });
+    }
+  }
+
+  emitProjectCreated(args: {
+    project: ProjectResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: ProjectCreatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { project: args.project },
+    });
+    if (!this.io) return;
+    try {
+      // MVP: fan-out qua user room của owner; các client khác refetch qua
+      // reconcile. Phase 2 sẽ xem xét thêm project-list room hoặc user room
+      // cho mọi active user.
+      this.io
+        .to(userRoom(args.project.userId))
+        .emit("project:created", payload);
+    } catch (error) {
+      console.error("[realtime] project:created event publish failed", {
+        projectId: args.project.id,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitProjectUpdated(args: {
+    projectId: string;
+    project: ProjectResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: ProjectUpdatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { project: args.project },
+    });
+    if (!this.io) return;
+    try {
+      this.io.to(projectRoom(args.projectId)).emit("project:updated", payload);
+    } catch (error) {
+      console.error("[realtime] project:updated event publish failed", {
+        projectId: args.projectId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitProjectDeleted(args: {
+    projectId: string;
+    project: ProjectResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: ProjectDeletedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { projectId: args.projectId, project: args.project },
+    });
+    if (!this.io) return;
+    try {
+      this.io.to(projectRoom(args.projectId)).emit("project:deleted", payload);
+    } catch (error) {
+      console.error("[realtime] project:deleted event publish failed", {
+        projectId: args.projectId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitProjectMemberAdded(args: {
+    projectId: string;
+    member: ProjectMemberResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: ProjectMemberAddedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { projectId: args.projectId, member: args.member },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(projectRoom(args.projectId))
+        .emit("project:member_added", payload);
+    } catch (error) {
+      console.error("[realtime] project:member_added event publish failed", {
+        projectId: args.projectId,
+        memberId: args.member.id,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitProjectMemberRemoved(args: {
+    projectId: string;
+    memberId: string;
+    userId: string;
+    actorId?: string | null;
+  }): void {
+    const payload: ProjectMemberRemovedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: {
+        projectId: args.projectId,
+        memberId: args.memberId,
+        userId: args.userId,
+      },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(projectRoom(args.projectId))
+        .emit("project:member_removed", payload);
+    } catch (error) {
+      console.error("[realtime] project:member_removed event publish failed", {
+        projectId: args.projectId,
+        memberId: args.memberId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitProjectMemberRoleUpdated(args: {
+    projectId: string;
+    member: ProjectMemberResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: ProjectMemberRoleUpdatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { projectId: args.projectId, member: args.member },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(projectRoom(args.projectId))
+        .emit("project:member_role_updated", payload);
+    } catch (error) {
+      console.error(
+        "[realtime] project:member_role_updated event publish failed",
+        {
+          projectId: args.projectId,
+          memberId: args.member.id,
+          eventId: payload.eventId,
+          error,
+        },
+      );
     }
   }
 }

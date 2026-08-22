@@ -110,11 +110,13 @@ export class ProjectController {
 
   async addMember(req: Request, res: Response): Promise<Response> {
     const { projectId } = req.params;
+    const user = (req as any).user;
 
     const addMemberDto = new AddProjectMemberRequestDto(req.body as any);
     const result = await this.projectService.addMember(
       projectId as string,
       addMemberDto,
+      user?.id,
     );
 
     if (result instanceof Exception) {
@@ -137,13 +139,15 @@ export class ProjectController {
     return new HttpResponseDto().success(res, result);
   }
 
-  async updateProjectMember(req: Request, res: Response): Promise<Response> {
+async updateProjectMember(req: Request, res: Response): Promise<Response> {
     const { projectId, memberId } = req.params;
+    const user = (req as any).user;
     const updateMemberDto = new UpdateProjectMemberRequestDto(req.body as any);
     const result = await this.projectService.updateProjectMember(
       projectId as string,
       memberId as string,
       updateMemberDto,
+      user?.id,
     );
 
     if (result instanceof Exception) {
@@ -153,11 +157,13 @@ export class ProjectController {
     return new HttpResponseDto().success(res, result);
   }
 
-  async removeProjectMember(req: Request, res: Response): Promise<Response> {
+async removeProjectMember(req: Request, res: Response): Promise<Response> {
     const { projectId, memberId } = req.params;
+    const user = (req as any).user;
     const result = await this.projectService.removeProjectMember(
       projectId as string,
       memberId as string,
+      user?.id,
     );
 
     if (result instanceof Exception) {

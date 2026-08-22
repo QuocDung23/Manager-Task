@@ -19,13 +19,14 @@ import {
 import { ProjectsRepository } from "./projects.repository";
 import { Exception } from "@tsed/exceptions";
 import { GetProjectRequestDto } from "./dtos/request/getProject.req";
-import { Prisma, UserStatus } from "@prisma/client";
+import { Prisma, ProjectStatus, UserStatus } from "@prisma/client";
 import { GetAllProjectRequestDto } from "./dtos/request/getAllProject.req";
 import { UpdateProjectRequestDto } from "./dtos/request/updateProject.req";
 import { RoleRepository } from "../roles/roles.repository";
 import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
 import { UserRepository } from "../user/user.repository";
 import { ProjectRole } from "@/common/enums/roles";
+import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
 
 export class ProjectsService {
   constructor(
@@ -33,6 +34,7 @@ export class ProjectsService {
     private readonly rolesRepository = new RoleRepository(),
     private readonly projectMemberRepository = new ProjectMemberRepo(),
     private readonly userRepository = new UserRepository(),
+    private readonly realtime = realtimeEventService,
   ) {}
 
   async getProjectById(
@@ -151,9 +153,24 @@ export class ProjectsService {
       );
     }
 
+    const projectDto = new ProjectResponseDto(newProject as any);
+
+    try {
+      this.realtime.emitProjectCreated({
+        project: projectDto,
+        actorId: userId,
+      });
+    } catch (error) {
+      console.error("[realtime] emitProjectCreated failed (HTTP continues)", {
+        projectId: projectDto.id,
+        userId,
+        error,
+      });
+    }
+
     return {
       success: true,
-      data: new ProjectResponseDto(newProject as any),
+      data: projectDto,
     };
   }
 
@@ -178,9 +195,34 @@ export class ProjectsService {
       },
     });
 
+    // ProjectStatus INACTIVE (soft-delete đã xảy ra trước) thì không emit
+    // update — board service khác sẽ lo delete event.
+    if (updateProject.status === ProjectStatus.INACTIVE) {
+      return {
+        success: true,
+        data: new ProjectResponseDto(updateProject),
+      };
+    }
+
+    const projectDto = new ProjectResponseDto(updateProject);
+
+    try {
+      this.realtime.emitProjectUpdated({
+        projectId: projectDto.id,
+        project: projectDto,
+        actorId: userId,
+      });
+    } catch (error) {
+      console.error("[realtime] emitProjectUpdated failed (HTTP continues)", {
+        projectId: projectDto.id,
+        userId,
+        error,
+      });
+    }
+
     return {
       success: true,
-      data: new ProjectResponseDto(updateProject),
+      data: projectDto,
     };
   }
 
@@ -201,15 +243,32 @@ export class ProjectsService {
       userId,
     });
 
+    const projectDto = new ProjectResponseDto(deletedProject);
+
+    try {
+      this.realtime.emitProjectDeleted({
+        projectId: projectDto.id,
+        project: projectDto,
+        actorId: userId,
+      });
+    } catch (error) {
+      console.error("[realtime] emitProjectDeleted failed (HTTP continues)", {
+        projectId: projectDto.id,
+        userId,
+        error,
+      });
+    }
+
     return {
       success: true,
-      data: new ProjectResponseDto(deletedProject),
+      data: projectDto,
     };
   }
 
   async addMember(
     projectId: string,
     addMemberDto: AddProjectMemberRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
     const project = await this.projectsRepository.getProject({ id: projectId });
     if (!project) {
@@ -244,9 +303,26 @@ export class ProjectsService {
       memberRole.id,
     );
 
+    const memberDto = new ProjectMemberResponseDto(member);
+
+    try {
+      this.realtime.emitProjectMemberAdded({
+        projectId,
+        member: memberDto,
+        actorId: actorUserId ?? null,
+      });
+    } catch (error) {
+      console.error("[realtime] emitProjectMemberAdded failed (HTTP continues)", {
+        projectId,
+        memberId: memberDto.id,
+        actorUserId,
+        error,
+      });
+    }
+
     return {
       success: true,
-      data: new ProjectMemberResponseDto(member),
+      data: memberDto,
     };
   }
 
@@ -275,6 +351,7 @@ export class ProjectsService {
     projectId: string,
     memberId: string,
     updateMemberDto: UpdateProjectMemberRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
     const project = await this.projectsRepository.getProject({ id: projectId });
     if (!project) {
@@ -313,15 +390,36 @@ export class ProjectsService {
         role.id,
       );
 
+    const memberDto = new ProjectMemberResponseDto(updatedMember);
+
+    try {
+      this.realtime.emitProjectMemberRoleUpdated({
+        projectId,
+        member: memberDto,
+        actorId: actorUserId ?? null,
+      });
+    } catch (error) {
+      console.error(
+        "[realtime] emitProjectMemberRoleUpdated failed (HTTP continues)",
+        {
+          projectId,
+          memberId: memberDto.id,
+          actorUserId,
+          error,
+        },
+      );
+    }
+
     return {
       success: true,
-      data: new ProjectMemberResponseDto(updatedMember),
+      data: memberDto,
     };
   }
 
   async removeProjectMember(
     projectId: string,
     memberId: string,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
     const project = await this.projectsRepository.getProject({ id: projectId });
     if (!project) {
@@ -346,6 +444,25 @@ export class ProjectsService {
         memberId,
         member.userId,
       );
+
+    try {
+      this.realtime.emitProjectMemberRemoved({
+        projectId,
+        memberId,
+        userId: member.userId,
+        actorId: actorUserId ?? null,
+      });
+    } catch (error) {
+      console.error(
+        "[realtime] emitProjectMemberRemoved failed (HTTP continues)",
+        {
+          projectId,
+          memberId,
+          actorUserId,
+          error,
+        },
+      );
+    }
 
     return {
       success: true,

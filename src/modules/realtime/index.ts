@@ -6,4 +6,5 @@ export * from "./socket-auth.middleware";
 export * from "./task-comment.socket";
 export * from "./task-room.socket";
 export * from "./board-room.socket";
+export * from "./project-room.socket";
 export * from "./room-permission.service";

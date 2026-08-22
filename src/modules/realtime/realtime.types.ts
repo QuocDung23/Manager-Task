@@ -33,6 +33,14 @@ export type ClientToServerEvents = {
     payload: { boardId: string },
     ack?: (res: RealtimeAck) => void,
   ) => void;
+  "project:join": (
+    payload: { projectId: string },
+    ack?: (res: RealtimeAck) => void,
+  ) => void;
+  "project:leave": (
+    payload: { projectId: string },
+    ack?: (res: RealtimeAck) => void,
+  ) => void;
 };
 
 export type TaskCommentCreatedPayload = {
@@ -141,6 +149,35 @@ export type BoardTagPayload = RealtimeEnvelope<{
   tag: import("@/modules/tasks/tag/dtos/response").TagResponseDto;
 }>;
 
+export type ProjectCreatedPayload = RealtimeEnvelope<{
+  project: import("@/modules/projects/dtos/response").ProjectResponseDto;
+}>;
+
+export type ProjectUpdatedPayload = RealtimeEnvelope<{
+  project: import("@/modules/projects/dtos/response").ProjectResponseDto;
+}>;
+
+export type ProjectDeletedPayload = RealtimeEnvelope<{
+  projectId: string;
+  project: import("@/modules/projects/dtos/response").ProjectResponseDto;
+}>;
+
+export type ProjectMemberAddedPayload = RealtimeEnvelope<{
+  projectId: string;
+  member: import("@/modules/projects/dtos/response").ProjectMemberResponseDto;
+}>;
+
+export type ProjectMemberRemovedPayload = RealtimeEnvelope<{
+  projectId: string;
+  memberId: string;
+  userId: string;
+}>;
+
+export type ProjectMemberRoleUpdatedPayload = RealtimeEnvelope<{
+  projectId: string;
+  member: import("@/modules/projects/dtos/response").ProjectMemberResponseDto;
+}>;
+
 export type UserNotificationPayload = {
   type:
     | "TASK_DUE_SOON"
@@ -176,6 +213,14 @@ export type ServerToClientEvents = {
   "board:tag_created": (payload: BoardTagPayload) => void;
   "board:tag_updated": (payload: BoardTagPayload) => void;
   "board:tag_deleted": (payload: BoardTagPayload) => void;
+  "project:created": (payload: ProjectCreatedPayload) => void;
+  "project:updated": (payload: ProjectUpdatedPayload) => void;
+  "project:deleted": (payload: ProjectDeletedPayload) => void;
+  "project:member_added": (payload: ProjectMemberAddedPayload) => void;
+  "project:member_removed": (payload: ProjectMemberRemovedPayload) => void;
+  "project:member_role_updated": (
+    payload: ProjectMemberRoleUpdatedPayload,
+  ) => void;
   "notification:new": (payload: UserNotificationPayload) => void;
 };
 
@@ -192,4 +237,5 @@ export type SocketData = {
 
 export const taskRoom = (taskId: string) => `task:${taskId}`;
 export const boardRoom = (boardId: string) => `board:${boardId}`;
+export const projectRoom = (projectId: string) => `project:${projectId}`;
 export const userRoom = (userId: string) => `user:${userId}`;

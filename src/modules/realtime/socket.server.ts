@@ -11,6 +11,7 @@ import {
 import { socketAuthMiddleware } from "./socket-auth.middleware";
 import { registerTaskRoomHandlers } from "./task-room.socket";
 import { registerBoardRoomHandlers } from "./board-room.socket";
+import { registerProjectRoomHandlers } from "./project-room.socket";
 import { realtimeEventService } from "./realtime-event.service";
 
 export type AppSocketServer = Server<
@@ -64,6 +65,7 @@ export const initSocketServer = (
     socket.join(userRoom(socket.data.user.id));
     registerTaskRoomHandlers(io, socket);
     registerBoardRoomHandlers(io, socket);
+    registerProjectRoomHandlers(io, socket);
   });
 
   ioInstance = io;
