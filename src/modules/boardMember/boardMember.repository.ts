@@ -55,9 +55,7 @@ export class BoardMemberRepository {
     });
   }
 
-  getActiveBoardMembersWithUser(
-    boardId: string,
-  ): Promise<
+  getActiveBoardMembersWithUser(boardId: string): Promise<
     Array<
       boardMembers & {
         user: {
@@ -86,6 +84,40 @@ export class BoardMemberRepository {
         },
       },
       orderBy: { createdAt: "asc" },
+    }) as any;
+  }
+
+  getActiveBoardMemberWithUser(
+    boardId: string,
+    userId: string,
+  ): Promise<
+    | (boardMembers & {
+        user: {
+          id: string;
+          name: string;
+          email: string;
+          avatar: string | null;
+        };
+      })
+    | null
+  > {
+    return this.prisma.boardMembers.findFirst({
+      where: {
+        boardId,
+        userId,
+        status: BoardMemberStatus.ACTIVE,
+        deletedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
     }) as any;
   }
 }

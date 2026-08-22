@@ -23,6 +23,7 @@ import { BoardMemberRepository } from "../boardMember/boardMember.repository";
 import { UpdateBoardRequestDto } from "./dtos/requests/updateBoard.req";
 import { DeleteBoardRequestDto } from "./dtos/requests/deleteBoard.req";
 import { AddMemberBoardRequestDto } from "./dtos/requests/addMemberBoard.req";
+import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
 
 export class BoardService {
   constructor(
@@ -140,9 +141,16 @@ export class BoardService {
       adminBoad.id,
     );
 
+    const boardDto = new BoardResponseDto(newBoard as any);
+    realtimeEventService.emitBoardCreated({
+      projectId,
+      board: boardDto,
+      actorId: userId,
+    });
+
     return {
       success: true,
-      data: new BoardResponseDto(newBoard as any),
+      data: boardDto,
     };
   }
 
@@ -174,9 +182,17 @@ export class BoardService {
       board: updateBoarData,
     });
 
+    const boardDto = new BoardResponseDto(updatedBoard);
+    realtimeEventService.emitBoardUpdated({
+      projectId: existingBoard.projectId,
+      boardId: updateBoard.boardId,
+      board: boardDto,
+      actorId: updateBoard.userId,
+    });
+
     return {
       success: true,
-      data: new BoardResponseDto(updatedBoard),
+      data: boardDto,
     };
   }
 
@@ -203,14 +219,23 @@ export class BoardService {
       userId: deleteBoard.userId,
     });
 
+    const boardDto = new BoardResponseDto(deletedBoard);
+    realtimeEventService.emitBoardDeleted({
+      projectId: deletedBoard.projectId,
+      boardId: deleteBoard.boardId,
+      board: boardDto,
+      actorId: deleteBoard.userId,
+    });
+
     return {
       success: true,
-      data: new BoardResponseDto(deletedBoard),
+      data: boardDto,
     };
   }
 
   async addMemberToBoard(
     addMemberBoardDto: AddMemberBoardRequestDto,
+    actorId?: string | null,
   ): Promise<HttpResponseBodySuccessDto<null> | Exception> {
     const { boardId, userId } = addMemberBoardDto;
 
@@ -250,6 +275,27 @@ export class BoardService {
       boardId,
       boardMemberRole.id,
     );
+
+    const memberRecord =
+      await this.boardMemberRepository.getActiveBoardMemberWithUser(
+        boardId,
+        userId,
+      );
+    if (memberRecord) {
+      realtimeEventService.emitBoardMemberAdded({
+        projectId: existingBoard.projectId,
+        boardId,
+        member: new BoardMemberResponseDto({
+          id: memberRecord.id,
+          userId: memberRecord.userId,
+          boardId: memberRecord.boardId,
+          roleId: memberRecord.roleId,
+          status: memberRecord.status,
+          user: memberRecord.user,
+        }),
+        actorId: actorId ?? null,
+      });
+    }
 
     return {
       success: true,

@@ -48,6 +48,7 @@ const rolePermissionMap: Record<string, readonly string[]> = {
   [ProjectRole.PROJECT_MEMBER]: [
     ProjectPermissions.VIEW_PROJECT,
     ProjectPermissions.CREATE_BOARD,
+    ProjectPermissions.VIEW_BOARD,
 
     ...Object.values(ListPermissions),
     ...memberTaskPermissions,

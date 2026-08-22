@@ -2,6 +2,8 @@ import { CommentResponseDto } from "@/modules/tasks/comment/dtos/response";
 import { ListResponseDto } from "@/modules/lists/dtos/responses/list.res";
 import { TaskResponseDto } from "@/modules/tasks/dtos/response";
 import { TaskLockStatus, TaskStatusAction } from "@prisma/client";
+import type { BoardResponseDto } from "@/modules/board/dtos/responses/board.res";
+import type { BoardMemberResponseDto } from "@/modules/board/dtos/responses/boardMember.res";
 
 export type RealtimeAck = {
   success: boolean;
@@ -149,6 +151,42 @@ export type BoardTagPayload = RealtimeEnvelope<{
   tag: import("@/modules/tasks/tag/dtos/response").TagResponseDto;
 }>;
 
+export type BoardCreatedPayload = RealtimeEnvelope<{
+  projectId: string;
+  board: BoardResponseDto;
+}>;
+
+export type BoardUpdatedPayload = RealtimeEnvelope<{
+  projectId: string;
+  boardId: string;
+  board: BoardResponseDto;
+}>;
+
+export type BoardDeletedPayload = RealtimeEnvelope<{
+  projectId: string;
+  boardId: string;
+  board: BoardResponseDto;
+}>;
+
+export type BoardMemberAddedPayload = RealtimeEnvelope<{
+  projectId: string;
+  boardId: string;
+  member: BoardMemberResponseDto;
+}>;
+
+export type BoardMemberRemovedPayload = RealtimeEnvelope<{
+  projectId: string;
+  boardId: string;
+  memberId: string;
+  userId: string;
+}>;
+
+export type BoardMemberRoleUpdatedPayload = RealtimeEnvelope<{
+  projectId: string;
+  boardId: string;
+  member: BoardMemberResponseDto;
+}>;
+
 export type ProjectCreatedPayload = RealtimeEnvelope<{
   project: import("@/modules/projects/dtos/response").ProjectResponseDto;
 }>;
@@ -195,9 +233,13 @@ export type ServerToClientEvents = {
   "task:comment_created": (payload: TaskCommentCreatedPayload) => void;
   "task:comment_replied": (payload: TaskCommentRepliedPayload) => void;
   "task:comment_updated": (payload: TaskCommentUpdatedPayload) => void;
-  "task:comment_reply_updated": (payload: TaskCommentReplyUpdatedPayload) => void;
+  "task:comment_reply_updated": (
+    payload: TaskCommentReplyUpdatedPayload,
+  ) => void;
   "task:comment_deleted": (payload: TaskCommentDeletedPayload) => void;
-  "task:comment_reply_deleted": (payload: TaskCommentReplyDeletedPayload) => void;
+  "task:comment_reply_deleted": (
+    payload: TaskCommentReplyDeletedPayload,
+  ) => void;
   "task:schedule_updated": (payload: TaskScheduleUpdatedPayload) => void;
   "task:due_soon": (payload: TaskDueSoonPayload) => void;
   "task:overdue_locked": (payload: TaskOverdueLockedPayload) => void;
@@ -205,7 +247,9 @@ export type ServerToClientEvents = {
   "task:unlocked": (payload: TaskScheduleUpdatedPayload) => void;
   "task:tags_updated": (payload: TaskTagsUpdatedPayload) => void;
   "task:assignments_updated": (payload: TaskAssignmentsUpdatedPayload) => void;
-  "task:status_action_updated": (payload: TaskStatusActionUpdatedPayload) => void;
+  "task:status_action_updated": (
+    payload: TaskStatusActionUpdatedPayload,
+  ) => void;
   "task:created": (payload: TaskCreatedPayload) => void;
   "list:created": (payload: ListCreatedPayload) => void;
   "board:lists_reordered": (payload: BoardListsReorderedPayload) => void;
@@ -213,6 +257,12 @@ export type ServerToClientEvents = {
   "board:tag_created": (payload: BoardTagPayload) => void;
   "board:tag_updated": (payload: BoardTagPayload) => void;
   "board:tag_deleted": (payload: BoardTagPayload) => void;
+  "board:created": (payload: BoardCreatedPayload) => void;
+  "board:updated": (payload: BoardUpdatedPayload) => void;
+  "board:deleted": (payload: BoardDeletedPayload) => void;
+  "board:member_added": (payload: BoardMemberAddedPayload) => void;
+  "board:member_removed": (payload: BoardMemberRemovedPayload) => void;
+  "board:member_role_updated": (payload: BoardMemberRoleUpdatedPayload) => void;
   "project:created": (payload: ProjectCreatedPayload) => void;
   "project:updated": (payload: ProjectUpdatedPayload) => void;
   "project:deleted": (payload: ProjectDeletedPayload) => void;

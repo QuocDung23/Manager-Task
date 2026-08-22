@@ -3,9 +3,15 @@ import { ListResponseDto } from "@/modules/lists/dtos/responses/list.res";
 import { TaskResponseDto } from "@/modules/tasks/dtos/response";
 import {
   boardRoom,
+  BoardCreatedPayload,
+  BoardDeletedPayload,
   BoardListsReorderedPayload,
+  BoardMemberAddedPayload,
+  BoardMemberRemovedPayload,
+  BoardMemberRoleUpdatedPayload,
   BoardTagPayload,
   BoardTasksReorderedPayload,
+  BoardUpdatedPayload,
   taskRoom,
   TaskTagsUpdatedPayload,
   TaskDueSoonPayload,
@@ -24,6 +30,8 @@ import {
   ProjectMemberRemovedPayload,
   ProjectMemberRoleUpdatedPayload,
 } from "./realtime.types";
+import type { BoardResponseDto } from "@/modules/board/dtos/responses/board.res";
+import type { BoardMemberResponseDto } from "@/modules/board/dtos/responses/boardMember.res";
 import type { ProjectResponseDto } from "@/modules/projects/dtos/response/project.res";
 import type { ProjectMemberResponseDto } from "@/modules/projects/dtos/response/projectMember.res";
 import type { AppSocketServer } from "./socket.server";
@@ -277,6 +285,182 @@ export class RealtimeEventService {
 
   emitBoardTagDeleted(boardId: string, tag: TagResponseDto, actorId?: string | null): void {
     this.emitBoardTagEvent("board:tag_deleted", boardId, tag, actorId);
+  }
+
+  emitBoardCreated(args: {
+    projectId: string;
+    board: BoardResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: BoardCreatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { projectId: args.projectId, board: args.board },
+    });
+    if (!this.io) return;
+    try {
+      this.io.to(projectRoom(args.projectId)).emit("board:created", payload);
+    } catch (error) {
+      console.error("[realtime] board:created event publish failed", {
+        projectId: args.projectId,
+        boardId: args.board.id,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitBoardUpdated(args: {
+    projectId: string;
+    boardId: string;
+    board: BoardResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: BoardUpdatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { projectId: args.projectId, boardId: args.boardId, board: args.board },
+    });
+    if (!this.io) return;
+    try {
+      // Phát tới cả project room (để grid view thấy metadata event) và board
+      // room (nếu user đang mở board detail cùng lúc).
+      this.io
+        .to(projectRoom(args.projectId))
+        .to(boardRoom(args.boardId))
+        .emit("board:updated", payload);
+    } catch (error) {
+      console.error("[realtime] board:updated event publish failed", {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitBoardDeleted(args: {
+    projectId: string;
+    boardId: string;
+    board: BoardResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: BoardDeletedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: { projectId: args.projectId, boardId: args.boardId, board: args.board },
+    });
+    if (!this.io) return;
+    try {
+      // Phát tới cả project room và board room để client đang mở board
+      // detail nhận được và đóng modal / back về grid.
+      this.io
+        .to(projectRoom(args.projectId))
+        .to(boardRoom(args.boardId))
+        .emit("board:deleted", payload);
+    } catch (error) {
+      console.error("[realtime] board:deleted event publish failed", {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitBoardMemberAdded(args: {
+    projectId: string;
+    boardId: string;
+    member: BoardMemberResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: BoardMemberAddedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        member: args.member,
+      },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(projectRoom(args.projectId))
+        .to(boardRoom(args.boardId))
+        .emit("board:member_added", payload);
+    } catch (error) {
+      console.error("[realtime] board:member_added event publish failed", {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        memberId: args.member.id,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitBoardMemberRemoved(args: {
+    projectId: string;
+    boardId: string;
+    memberId: string;
+    userId: string;
+    actorId?: string | null;
+  }): void {
+    const payload: BoardMemberRemovedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        memberId: args.memberId,
+        userId: args.userId,
+      },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(projectRoom(args.projectId))
+        .to(boardRoom(args.boardId))
+        .emit("board:member_removed", payload);
+    } catch (error) {
+      console.error("[realtime] board:member_removed event publish failed", {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        memberId: args.memberId,
+        eventId: payload.eventId,
+        error,
+      });
+    }
+  }
+
+  emitBoardMemberRoleUpdated(args: {
+    projectId: string;
+    boardId: string;
+    member: BoardMemberResponseDto;
+    actorId?: string | null;
+  }): void {
+    const payload: BoardMemberRoleUpdatedPayload = createRealtimeEnvelope({
+      actorId: args.actorId,
+      data: {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        member: args.member,
+      },
+    });
+    if (!this.io) return;
+    try {
+      this.io
+        .to(projectRoom(args.projectId))
+        .to(boardRoom(args.boardId))
+        .emit("board:member_role_updated", payload);
+    } catch (error) {
+      console.error(
+        "[realtime] board:member_role_updated event publish failed",
+        {
+          projectId: args.projectId,
+          boardId: args.boardId,
+          memberId: args.member.id,
+          eventId: payload.eventId,
+          error,
+        },
+      );
+    }
   }
 
   emitUserNotification(userId: string, notification: UserNotificationPayload) {

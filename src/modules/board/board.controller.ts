@@ -101,18 +101,20 @@ export class BoardController {
   }
 
   async addMemberToBoard(req: Request, res: Response): Promise<Response> {
+    const actor = (req as any).user;
     const boardId = req.params.boardId as string;
     const { userId } = req.body as { userId: string };
 
     const payload = {
       boardId,
       userId,
+      actorId: actor?.id ?? null,
     };
 
     const addMemberBoardDto = new AddMemberBoardRequestDto(
       payload as AddMemberBoardRequestDto,
     );
-    const result = await this.boardService.addMemberToBoard(addMemberBoardDto);
+    const result = await this.boardService.addMemberToBoard(addMemberBoardDto, actor?.id ?? null);
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
