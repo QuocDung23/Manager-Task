@@ -58,6 +58,9 @@ export class BoardRepository {
 
           deletedAt: { equals: null },
         },
+        orderBy: {
+          createdAt: "desc",
+        },
         skip,
         take,
       }),
