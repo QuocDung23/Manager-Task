@@ -207,10 +207,15 @@ export class ProjectsService {
     const projectDto = new ProjectResponseDto(updateProject);
 
     try {
+      const recipientUserIds =
+        await this.projectsRepository.getActiveProjectMemberUserIds(
+          projectDto.id,
+        );
       this.realtime.emitProjectUpdated({
         projectId: projectDto.id,
         project: projectDto,
         actorId: userId,
+        recipientUserIds,
       });
     } catch (error) {
       console.error("[realtime] emitProjectUpdated failed (HTTP continues)", {
@@ -238,6 +243,11 @@ export class ProjectsService {
       throw new NotFoundException("Project not found");
     }
 
+    // Snapshot recipients TRƯỚC soft-delete vì query sau delete sẽ trả về record
+    // đã INACTIVE/deleted, mất danh sách user cần fan-out realtime.
+    const recipientUserIds =
+      await this.projectsRepository.getActiveProjectMemberUserIds(id);
+
     const deletedProject = await this.projectsRepository.deleteProject({
       id,
       userId,
@@ -250,6 +260,7 @@ export class ProjectsService {
         projectId: projectDto.id,
         project: projectDto,
         actorId: userId,
+        recipientUserIds,
       });
     } catch (error) {
       console.error("[realtime] emitProjectDeleted failed (HTTP continues)", {
@@ -304,12 +315,22 @@ export class ProjectsService {
     );
 
     const memberDto = new ProjectMemberResponseDto(member);
+    const projectDto = new ProjectResponseDto(project as any);
 
     try {
+      // Fan-out tới user room của member mới + owner + các member ACTIVE hiện tại
+      // để user mới thấy project xuất hiện trong list, các member khác patch
+      // members cache nếu đang mở detail.
+      const recipientSet = new Set<string>([memberDto.userId]);
+      const memberRecipients =
+        await this.projectsRepository.getActiveProjectMemberUserIds(projectId);
+      for (const id of memberRecipients) recipientSet.add(id);
       this.realtime.emitProjectMemberAdded({
         projectId,
+        project: projectDto,
         member: memberDto,
         actorId: actorUserId ?? null,
+        recipientUserIds: Array.from(recipientSet),
       });
     } catch (error) {
       console.error("[realtime] emitProjectMemberAdded failed (HTTP continues)", {

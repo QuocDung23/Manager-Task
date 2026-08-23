@@ -203,4 +203,30 @@ export class ProjectsRepository {
       },
     });
   }
+
+  /**
+   * Trả về danh sách `userId` có access ACTIVE tới project: owner + mọi project member
+   * ACTIVE. Dùng cho realtime fan-out tới `user:{userId}` room trước khi mutate
+   * project (đặc biệt với soft-delete, vì query sau delete sẽ không còn trả record).
+   */
+  async getActiveProjectMemberUserIds(projectId: string): Promise<string[]> {
+    const [memberRows, project] = await Promise.all([
+      this.prismaService.projectMembers.findMany({
+        where: {
+          projectId,
+          status: ProjectMemberStatus.ACTIVE,
+          deletedAt: null,
+        },
+        select: { userId: true },
+      }),
+      this.prismaService.projects.findFirst({
+        where: { id: projectId, deletedAt: null },
+        select: { userId: true },
+      }),
+    ]);
+    const ids = new Set<string>();
+    if (project?.userId) ids.add(project.userId);
+    for (const row of memberRows) ids.add(row.userId);
+    return Array.from(ids);
+  }
 }

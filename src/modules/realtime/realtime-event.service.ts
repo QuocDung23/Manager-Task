@@ -54,6 +54,19 @@ function nextBoardRevision(boardId: string): number {
   return next;
 }
 
+function chainRoomTargets(
+  base: ReturnType<AppSocketServer["to"]>,
+  userIds: readonly string[] | undefined,
+): ReturnType<AppSocketServer["to"]> {
+  if (!userIds || userIds.length === 0) return base;
+  let chain = base;
+  for (const userId of userIds) {
+    if (typeof userId !== "string" || userId.length === 0) continue;
+    chain = chain.to(userRoom(userId));
+  }
+  return chain;
+}
+
 /**
  * Service emit realtime event tới các client đang subscribe.
  * Lấy io instance qua `setIO()` khi server bootstrap.
@@ -65,7 +78,9 @@ export class RealtimeEventService {
     this.io = io;
   }
 
-  private emitToRoom<K extends keyof import("./realtime.types").ServerToClientEvents>(
+  private emitToRoom<
+    K extends keyof import("./realtime.types").ServerToClientEvents,
+  >(
     room: string,
     event: K,
     payload: Parameters<import("./realtime.types").ServerToClientEvents[K]>[0],
@@ -89,7 +104,10 @@ export class RealtimeEventService {
   }
 
   emitTaskCommentCreated(taskId: string, comment: CommentResponseDto) {
-    this.emitToRoom(taskRoom(taskId), "task:comment_created", { taskId, comment });
+    this.emitToRoom(taskRoom(taskId), "task:comment_created", {
+      taskId,
+      comment,
+    });
   }
 
   emitTaskCommentReplied(
@@ -105,7 +123,10 @@ export class RealtimeEventService {
   }
 
   emitTaskCommentUpdated(taskId: string, comment: CommentResponseDto) {
-    this.emitToRoom(taskRoom(taskId), "task:comment_updated", { taskId, comment });
+    this.emitToRoom(taskRoom(taskId), "task:comment_updated", {
+      taskId,
+      comment,
+    });
   }
 
   emitTaskCommentReplyUpdated(
@@ -149,7 +170,10 @@ export class RealtimeEventService {
   }
 
   emitTaskScheduleUpdated(taskId: string, task: TaskResponseDto) {
-    this.emitToRoom(taskRoom(taskId), "task:schedule_updated", { taskId, task });
+    this.emitToRoom(taskRoom(taskId), "task:schedule_updated", {
+      taskId,
+      task,
+    });
   }
 
   emitTaskRescheduled(taskId: string, task: TaskResponseDto) {
@@ -275,15 +299,27 @@ export class RealtimeEventService {
     }
   }
 
-  emitBoardTagCreated(boardId: string, tag: TagResponseDto, actorId?: string | null): void {
+  emitBoardTagCreated(
+    boardId: string,
+    tag: TagResponseDto,
+    actorId?: string | null,
+  ): void {
     this.emitBoardTagEvent("board:tag_created", boardId, tag, actorId);
   }
 
-  emitBoardTagUpdated(boardId: string, tag: TagResponseDto, actorId?: string | null): void {
+  emitBoardTagUpdated(
+    boardId: string,
+    tag: TagResponseDto,
+    actorId?: string | null,
+  ): void {
     this.emitBoardTagEvent("board:tag_updated", boardId, tag, actorId);
   }
 
-  emitBoardTagDeleted(boardId: string, tag: TagResponseDto, actorId?: string | null): void {
+  emitBoardTagDeleted(
+    boardId: string,
+    tag: TagResponseDto,
+    actorId?: string | null,
+  ): void {
     this.emitBoardTagEvent("board:tag_deleted", boardId, tag, actorId);
   }
 
@@ -317,7 +353,11 @@ export class RealtimeEventService {
   }): void {
     const payload: BoardUpdatedPayload = createRealtimeEnvelope({
       actorId: args.actorId,
-      data: { projectId: args.projectId, boardId: args.boardId, board: args.board },
+      data: {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        board: args.board,
+      },
     });
     if (!this.io) return;
     try {
@@ -345,7 +385,11 @@ export class RealtimeEventService {
   }): void {
     const payload: BoardDeletedPayload = createRealtimeEnvelope({
       actorId: args.actorId,
-      data: { projectId: args.projectId, boardId: args.boardId, board: args.board },
+      data: {
+        projectId: args.projectId,
+        boardId: args.boardId,
+        board: args.board,
+      },
     });
     if (!this.io) return;
     try {
@@ -528,7 +572,9 @@ export class RealtimeEventService {
     });
     if (!this.io) return;
     try {
-      this.io.to(boardRoom(args.boardId)).emit("board:lists_reordered", payload);
+      this.io
+        .to(boardRoom(args.boardId))
+        .emit("board:lists_reordered", payload);
     } catch (error) {
       console.error("[realtime] board:lists_reordered event publish failed", {
         boardId: args.boardId,
@@ -606,6 +652,7 @@ export class RealtimeEventService {
     projectId: string;
     project: ProjectResponseDto;
     actorId?: string | null;
+    recipientUserIds?: readonly string[];
   }): void {
     const payload: ProjectUpdatedPayload = createRealtimeEnvelope({
       actorId: args.actorId,
@@ -613,7 +660,11 @@ export class RealtimeEventService {
     });
     if (!this.io) return;
     try {
-      this.io.to(projectRoom(args.projectId)).emit("project:updated", payload);
+      const chain = chainRoomTargets(
+        this.io.to(projectRoom(args.projectId)),
+        args.recipientUserIds,
+      );
+      chain.emit("project:updated", payload);
     } catch (error) {
       console.error("[realtime] project:updated event publish failed", {
         projectId: args.projectId,
@@ -627,6 +678,7 @@ export class RealtimeEventService {
     projectId: string;
     project: ProjectResponseDto;
     actorId?: string | null;
+    recipientUserIds?: readonly string[];
   }): void {
     const payload: ProjectDeletedPayload = createRealtimeEnvelope({
       actorId: args.actorId,
@@ -634,7 +686,11 @@ export class RealtimeEventService {
     });
     if (!this.io) return;
     try {
-      this.io.to(projectRoom(args.projectId)).emit("project:deleted", payload);
+      const chain = chainRoomTargets(
+        this.io.to(projectRoom(args.projectId)),
+        args.recipientUserIds,
+      );
+      chain.emit("project:deleted", payload);
     } catch (error) {
       console.error("[realtime] project:deleted event publish failed", {
         projectId: args.projectId,
@@ -646,18 +702,26 @@ export class RealtimeEventService {
 
   emitProjectMemberAdded(args: {
     projectId: string;
+    project: ProjectResponseDto;
     member: ProjectMemberResponseDto;
     actorId?: string | null;
+    recipientUserIds?: readonly string[];
   }): void {
     const payload: ProjectMemberAddedPayload = createRealtimeEnvelope({
       actorId: args.actorId,
-      data: { projectId: args.projectId, member: args.member },
+      data: {
+        projectId: args.projectId,
+        project: args.project,
+        member: args.member,
+      },
     });
     if (!this.io) return;
     try {
-      this.io
-        .to(projectRoom(args.projectId))
-        .emit("project:member_added", payload);
+      const chain = chainRoomTargets(
+        this.io.to(projectRoom(args.projectId)),
+        args.recipientUserIds,
+      );
+      chain.emit("project:member_added", payload);
     } catch (error) {
       console.error("[realtime] project:member_added event publish failed", {
         projectId: args.projectId,

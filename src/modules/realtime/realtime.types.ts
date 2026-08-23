@@ -202,6 +202,7 @@ export type ProjectDeletedPayload = RealtimeEnvelope<{
 
 export type ProjectMemberAddedPayload = RealtimeEnvelope<{
   projectId: string;
+  project: import("@/modules/projects/dtos/response").ProjectResponseDto;
   member: import("@/modules/projects/dtos/response").ProjectMemberResponseDto;
 }>;
 
