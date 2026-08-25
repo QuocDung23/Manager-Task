@@ -14,7 +14,7 @@ import {
 } from "@/common";
 import { GetAllBoardRequestDto } from "./dtos/requests/getAllBoard.req";
 import { CreateBoardRequestDto } from "./dtos/requests/createBoard.req";
-import { Prisma } from "@prisma/client";
+import { NotificationPriority, Prisma } from "@prisma/client";
 import { RoleRepository } from "../roles/roles.repository";
 import { BoardRole } from "@/common/enums/roles";
 import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
@@ -24,6 +24,7 @@ import { UpdateBoardRequestDto } from "./dtos/requests/updateBoard.req";
 import { DeleteBoardRequestDto } from "./dtos/requests/deleteBoard.req";
 import { AddMemberBoardRequestDto } from "./dtos/requests/addMemberBoard.req";
 import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
+import { notificationInboxService } from "@/modules/notification";
 
 export class BoardService {
   constructor(
@@ -296,6 +297,19 @@ export class BoardService {
         actorId: actorId ?? null,
       });
     }
+    await notificationInboxService.createForRecipients({
+      recipientIds: [userId],
+      actorId,
+      type: "BOARD_MEMBER_ADDED",
+      priority: NotificationPriority.DIRECT,
+      title: "You were added to a board",
+      body: `You now have access to "${existingBoard.name}".`,
+      projectId: existingBoard.projectId,
+      boardId,
+      data: { boardName: existingBoard.name },
+      dedupeKey: (recipientId) =>
+        `board:${boardId}:member-added:${memberRecord?.id ?? userId}:${recipientId}`,
+    });
 
     return {
       success: true,

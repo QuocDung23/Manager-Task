@@ -55,7 +55,9 @@ app.use("/task", [
   Modules.taskRouter,
   Modules.taskCommentRouter,
   Modules.taskTagRouter,
+  Modules.taskActivityRouter,
 ]);
+app.use("/notification", Modules.notificationRouter);
 
 app.use(openAPIRouter);
 

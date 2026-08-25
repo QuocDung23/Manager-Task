@@ -19,7 +19,12 @@ import {
 import { ProjectsRepository } from "./projects.repository";
 import { Exception } from "@tsed/exceptions";
 import { GetProjectRequestDto } from "./dtos/request/getProject.req";
-import { Prisma, ProjectStatus, UserStatus } from "@prisma/client";
+import {
+  NotificationPriority,
+  Prisma,
+  ProjectStatus,
+  UserStatus,
+} from "@prisma/client";
 import { GetAllProjectRequestDto } from "./dtos/request/getAllProject.req";
 import { UpdateProjectRequestDto } from "./dtos/request/updateProject.req";
 import { RoleRepository } from "../roles/roles.repository";
@@ -27,6 +32,7 @@ import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
 import { UserRepository } from "../user/user.repository";
 import { ProjectRole } from "@/common/enums/roles";
 import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
+import { notificationInboxService } from "@/modules/notification";
 
 export class ProjectsService {
   constructor(
@@ -167,7 +173,6 @@ export class ProjectsService {
         error,
       });
     }
-
     return {
       success: true,
       data: projectDto,
@@ -224,7 +229,6 @@ export class ProjectsService {
         error,
       });
     }
-
     return {
       success: true,
       data: projectDto,
@@ -340,6 +344,18 @@ export class ProjectsService {
         error,
       });
     }
+    await notificationInboxService.createForRecipients({
+      recipientIds: [memberDto.userId],
+      actorId: actorUserId,
+      type: "PROJECT_MEMBER_ADDED",
+      priority: NotificationPriority.DIRECT,
+      title: "You were added to a project",
+      body: `You now have access to "${project.name}".`,
+      projectId,
+      data: { projectName: project.name },
+      dedupeKey: (recipientId) =>
+        `project:${projectId}:member-added:${memberDto.id}:${recipientId}`,
+    });
 
     return {
       success: true,
@@ -430,6 +446,18 @@ export class ProjectsService {
         },
       );
     }
+    await notificationInboxService.createForRecipients({
+      recipientIds: [memberDto.userId],
+      actorId: actorUserId,
+      type: "MEMBER_ROLE_CHANGED",
+      priority: NotificationPriority.DIRECT,
+      title: "Your project role changed",
+      body: `Your role in "${project.name}" was updated.`,
+      projectId,
+      data: { roleId: memberDto.roleId, projectName: project.name },
+      dedupeKey: (recipientId) =>
+        `project:${projectId}:role:${memberDto.id}:${memberDto.roleId}:${recipientId}`,
+    });
 
     return {
       success: true,
@@ -484,6 +512,18 @@ export class ProjectsService {
         },
       );
     }
+    await notificationInboxService.createForRecipients({
+      recipientIds: [member.userId],
+      actorId: actorUserId,
+      type: "MEMBER_REMOVED",
+      priority: NotificationPriority.DIRECT,
+      title: "You were removed from a project",
+      body: `You no longer have access to "${project.name}".`,
+      projectId,
+      data: { projectName: project.name },
+      dedupeKey: (recipientId) =>
+        `project:${projectId}:removed:${memberId}:${recipientId}`,
+    });
 
     return {
       success: true,

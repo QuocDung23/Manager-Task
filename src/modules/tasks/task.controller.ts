@@ -65,7 +65,8 @@ export class TaskController {
       ...(req.body as any),
       id,
     });
-    const result = await this.taskService.updateTask(updateTaskDto);
+    const actorUserId: string | undefined = (req as any).user?.id;
+    const result = await this.taskService.updateTask(updateTaskDto, actorUserId);
     if (result instanceof Exception) {
       throw new HttpResponseDto().exception(res, result);
     }

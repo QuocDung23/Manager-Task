@@ -26,6 +26,8 @@ import {
   TaskLockStatus,
   TaskScheduleEventType,
   TaskStatusAction,
+  TaskActivityType,
+  NotificationPriority,
   tasks,
 } from "@prisma/client";
 import { ListRepository } from "@/modules/lists/list.repository";
@@ -33,7 +35,11 @@ import { BoardMemberRepository } from "@/modules/boardMember/boardMember.reposit
 import { TaskWithAssignments, TaskRepository } from "./task.repository";
 import { taskScheduleConfig } from "@/configs";
 import { realtimeEventService } from "@/modules/realtime";
-import { notificationService } from "@/modules/notification";
+import {
+  notificationService,
+  notificationInboxService,
+} from "@/modules/notification";
+import { taskActivityService } from "@/modules/taskActivity/task-activity.service";
 
 const ORDER_STEP = 65536;
 
@@ -210,6 +216,25 @@ export class TaskService {
     if (createTaskDto.dueDate) {
       realtimeEventService.emitTaskScheduleUpdated(createTask.id, response);
     }
+    await taskActivityService.create({
+      taskId: createTask.id,
+      actorId: actorUserId,
+      type: TaskActivityType.TASK_CREATED,
+      metadata: { name: response.name },
+    });
+    if (createTaskDto.dueDate) {
+      await taskActivityService.create({
+        taskId: createTask.id,
+        actorId: actorUserId,
+        type: TaskActivityType.TASK_SCHEDULE_SET,
+        metadata: {
+          oldDueDate: null,
+          newDueDate: createTaskDto.dueDate.toISOString(),
+          oldReminderAt: null,
+          newReminderAt: createTaskDto.reminderAt?.toISOString() ?? null,
+        },
+      });
+    }
 
     return {
       success: true,
@@ -275,6 +300,7 @@ export class TaskService {
 
   async updateTask(
     updateTaskDto: updateTaskRequestDto,
+    actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const task = await this.taskRepository.getTaskById(updateTaskDto.id);
     if (!task) {
@@ -294,6 +320,26 @@ export class TaskService {
     // Query lại kèm assignments để response trả đúng `assign`.
     const taskWithAssignments =
       await this.taskRepository.getTaskByIdWithAssignments(updateTask.id);
+
+    if (updateTaskDto.name !== undefined && updateTaskDto.name !== task.name) {
+      await taskActivityService.create({
+        taskId: task.id,
+        actorId: actorUserId,
+        type: TaskActivityType.TASK_NAME_CHANGED,
+        metadata: { from: task.name, to: updateTaskDto.name },
+      });
+    }
+    if (
+      updateTaskDto.description !== undefined &&
+      updateTaskDto.description !== task.description
+    ) {
+      await taskActivityService.create({
+        taskId: task.id,
+        actorId: actorUserId,
+        type: TaskActivityType.TASK_DESCRIPTION_CHANGED,
+        metadata: { changedFields: ["description"] },
+      });
+    }
 
     return {
       success: true,
@@ -559,6 +605,9 @@ export class TaskService {
       );
     }
 
+    const previousUserIds = new Set(
+      await this.taskRepository.getTaskNotificationRecipients(taskId),
+    );
     // 3. replace assignments trong transaction
     const updatedTask = await this.taskRepository.replaceTaskAssignments(
       taskId,
@@ -578,6 +627,60 @@ export class TaskService {
       task: response,
       actorId: actorUserId,
     });
+
+    const memberById = new Map(
+      (await this.boardMemberRepository.getActiveBoardMembersWithUser(boardId))
+        .map((member) => [member.userId, member.user] as const),
+    );
+    const addedUserIds = uniqueUserIds.filter((id) => !previousUserIds.has(id));
+    const removedUserIds = [...previousUserIds].filter(
+      (id) => !uniqueUserIds.includes(id),
+    );
+    for (const userId of addedUserIds) {
+      const user = memberById.get(userId);
+      await taskActivityService.create({
+        taskId,
+        actorId: actorUserId,
+        type: TaskActivityType.TASK_ASSIGNEE_ADDED,
+        metadata: {
+          user: {
+            id: userId,
+            name: user?.name ?? "Unknown member",
+            avatar: user?.avatar ?? null,
+          },
+        },
+      });
+    }
+    for (const userId of removedUserIds) {
+      const user = memberById.get(userId);
+      await taskActivityService.create({
+        taskId,
+        actorId: actorUserId,
+        type: TaskActivityType.TASK_ASSIGNEE_REMOVED,
+        metadata: {
+          user: {
+            id: userId,
+            name: user?.name ?? "Unknown member",
+            avatar: user?.avatar ?? null,
+          },
+        },
+      });
+    }
+    if (addedUserIds.length > 0) {
+      await notificationInboxService.createForRecipients({
+        recipientIds: addedUserIds,
+        actorId: actorUserId,
+        type: "TASK_ASSIGNED",
+        priority: NotificationPriority.DIRECT,
+        title: "You were assigned to a task",
+        body: `You were assigned to "${response.name}".`,
+        boardId,
+        taskId,
+        data: { taskName: response.name },
+        dedupeKey: (recipientId) =>
+          `task:${taskId}:assigned:${response.assignmentVersion}:${recipientId}`,
+      });
+    }
 
     return {
       success: true,
@@ -628,6 +731,34 @@ export class TaskService {
       actorId: actorUserId,
     });
 
+    const removedMember =
+      await this.boardMemberRepository.getActiveBoardMemberWithUser(boardId, userId);
+    await taskActivityService.create({
+      taskId,
+      actorId: actorUserId,
+      type: TaskActivityType.TASK_ASSIGNEE_REMOVED,
+      metadata: {
+        user: {
+          id: userId,
+          name: removedMember?.user.name ?? "Unknown member",
+          avatar: removedMember?.user.avatar ?? null,
+        },
+      },
+    });
+    await notificationInboxService.createForRecipients({
+      recipientIds: [userId],
+      actorId: actorUserId,
+      type: "TASK_UNASSIGNED",
+      priority: NotificationPriority.DIRECT,
+      title: "You were unassigned from a task",
+      body: `You were removed from "${response.name}".`,
+      boardId,
+      taskId,
+      data: { taskName: response.name },
+      dedupeKey: (recipientId) =>
+        `task:${taskId}:unassigned:${response.assignmentVersion}:${recipientId}`,
+    });
+
     return {
       success: true,
       data: response,
@@ -671,6 +802,20 @@ export class TaskService {
     }
 
     const response = this.toTaskResponse(updatedTask);
+    await taskActivityService.create({
+      taskId: dto.taskId,
+      actorId: actorUserId,
+      type:
+        eventType === TaskScheduleEventType.RESCHEDULED
+          ? TaskActivityType.TASK_RESCHEDULED
+          : TaskActivityType.TASK_SCHEDULE_SET,
+      metadata: {
+        oldDueDate: task.dueDate?.toISOString() ?? null,
+        newDueDate: dto.dueDate.toISOString(),
+        oldReminderAt: task.reminderAt?.toISOString() ?? null,
+        newReminderAt: dto.reminderAt?.toISOString() ?? null,
+      },
+    });
     if (eventType === TaskScheduleEventType.RESCHEDULED) {
       realtimeEventService.emitTaskRescheduled(dto.taskId, response);
       await this.notifyTaskRecipients({
@@ -683,6 +828,19 @@ export class TaskService {
           dueDate: dto.dueDate.toISOString(),
           reminderAt: dto.reminderAt?.toISOString() ?? null,
         },
+      });
+      await notificationInboxService.createForRecipients({
+        recipientIds: await this.taskRepository.getTaskNotificationRecipients(dto.taskId),
+        actorId: actorUserId,
+        type: "TASK_RESCHEDULED",
+        priority: NotificationPriority.NORMAL,
+        title: "Task rescheduled",
+        body: `"${response.name}" has a new due date.`,
+        boardId: await this.resolveBoardIdByTaskId(dto.taskId),
+        taskId: dto.taskId,
+        data: { dueDate: dto.dueDate.toISOString() },
+        dedupeKey: (recipientId) =>
+          `task:${dto.taskId}:rescheduled:${response.rescheduleCount}:${recipientId}`,
       });
     } else {
       realtimeEventService.emitTaskScheduleUpdated(dto.taskId, response);
@@ -728,6 +886,30 @@ export class TaskService {
 
     const response = this.toTaskResponse(updatedTask);
     realtimeEventService.emitTaskScheduleUpdated(dto.taskId, response);
+    await taskActivityService.create({
+      taskId: dto.taskId,
+      actorId: actorUserId,
+      type: TaskActivityType.TASK_SCHEDULE_CLEARED,
+      metadata: {
+        oldDueDate: task.dueDate?.toISOString() ?? null,
+        newDueDate: null,
+        oldReminderAt: task.reminderAt?.toISOString() ?? null,
+        newReminderAt: null,
+      },
+    });
+    await notificationInboxService.createForRecipients({
+      recipientIds: await this.taskRepository.getTaskNotificationRecipients(dto.taskId),
+      actorId: actorUserId,
+      type: "TASK_SCHEDULE_CLEARED",
+      priority: NotificationPriority.NORMAL,
+      title: "Task schedule cleared",
+      body: `The schedule for "${response.name}" was cleared.`,
+      boardId: await this.resolveBoardIdByTaskId(dto.taskId),
+      taskId: dto.taskId,
+      data: {},
+      dedupeKey: (recipientId) =>
+        `task:${dto.taskId}:schedule-cleared:${Date.now()}:${recipientId}`,
+    });
 
     return {
       success: true,
@@ -763,6 +945,12 @@ export class TaskService {
 
     const response = this.toTaskResponse(updatedTask);
     realtimeEventService.emitTaskUnlocked(dto.taskId, response);
+    await taskActivityService.create({
+      taskId: dto.taskId,
+      actorId: actorUserId,
+      type: TaskActivityType.TASK_UNLOCKED,
+      metadata: { reason: dto.reason },
+    });
     await this.notifyTaskRecipients({
       taskId: dto.taskId,
       type: "TASK_UNLOCKED",
@@ -772,6 +960,19 @@ export class TaskService {
         taskId: dto.taskId,
         reason: dto.reason,
       },
+    });
+    await notificationInboxService.createForRecipients({
+      recipientIds: await this.taskRepository.getTaskNotificationRecipients(dto.taskId),
+      actorId: actorUserId,
+      type: "TASK_UNLOCKED",
+      priority: NotificationPriority.NORMAL,
+      title: "Task unlocked",
+      body: `"${response.name}" was unlocked.`,
+      boardId: await this.resolveBoardIdByTaskId(dto.taskId),
+      taskId: dto.taskId,
+      data: { reason: dto.reason },
+      dedupeKey: (recipientId) =>
+        `task:${dto.taskId}:unlocked:${response.updatedAt.toISOString()}:${recipientId}`,
     });
 
     return {
@@ -834,6 +1035,27 @@ export class TaskService {
           reminderAt: task.reminderAt?.toISOString() ?? null,
         },
       });
+      await taskActivityService.create({
+        taskId: task.id,
+        type: TaskActivityType.TASK_DUE_SOON,
+        metadata: {
+          dueDate: task.dueDate.toISOString(),
+          reminderAt: task.reminderAt?.toISOString() ?? null,
+        },
+        dedupeKey: `task:${task.id}:due-soon:${task.reminderAt?.toISOString() ?? task.dueDate.toISOString()}`,
+      });
+      await notificationInboxService.createForRecipients({
+        recipientIds: assignees.map((assignee) => assignee.id),
+        type: "TASK_DUE_SOON",
+        priority: NotificationPriority.URGENT,
+        title: "Task due soon",
+        body: `"${task.name}" is approaching its deadline.`,
+        boardId: await this.resolveBoardIdByTaskId(task.id),
+        taskId: task.id,
+        data: { dueDate: task.dueDate.toISOString() },
+        dedupeKey: (recipientId) =>
+          `task:${task.id}:due-soon:${task.reminderAt?.toISOString() ?? task.dueDate!.toISOString()}:${recipientId}`,
+      });
     }
 
     return sentCount;
@@ -894,6 +1116,30 @@ export class TaskService {
           lockedAt: lockedTask.lockedAt.toISOString(),
           lockStatus: TaskLockStatus.OVERDUE_LOCKED,
         },
+      });
+      await taskActivityService.create({
+        taskId: task.id,
+        type: TaskActivityType.TASK_OVERDUE_LOCKED,
+        metadata: {
+          dueDate: lockedTask.dueDate.toISOString(),
+          lockedAt: lockedTask.lockedAt.toISOString(),
+        },
+        dedupeKey: `task:${task.id}:overdue:${lockedTask.lockedAt.toISOString()}`,
+      });
+      await notificationInboxService.createForRecipients({
+        recipientIds: assignees.map((assignee) => assignee.id),
+        type: "TASK_OVERDUE_LOCKED",
+        priority: NotificationPriority.URGENT,
+        title: "Task overdue and locked",
+        body: `"${lockedTask.name}" is overdue and has been locked.`,
+        boardId: await this.resolveBoardIdByTaskId(task.id),
+        taskId: task.id,
+        data: {
+          dueDate: lockedTask.dueDate.toISOString(),
+          lockedAt: lockedTask.lockedAt.toISOString(),
+        },
+        dedupeKey: (recipientId) =>
+          `task:${task.id}:overdue:${lockedTask.lockedAt!.toISOString()}:${recipientId}`,
       });
     }
 
@@ -960,6 +1206,31 @@ export class TaskService {
       statusAction: dto.statusAction,
       actorId: actorUserId,
     });
+    await taskActivityService.create({
+      taskId: dto.taskId,
+      actorId: actorUserId,
+      type: TaskActivityType.TASK_STATUS_CHANGED,
+      metadata: { from: task.statusAction, to: dto.statusAction },
+    });
+    if (
+      dto.statusAction === TaskStatusAction.IN_REVIEW ||
+      dto.statusAction === TaskStatusAction.DONE ||
+      dto.statusAction === TaskStatusAction.CANCELLED
+    ) {
+      await notificationInboxService.createForRecipients({
+        recipientIds: await this.taskRepository.getTaskNotificationRecipients(dto.taskId),
+        actorId: actorUserId,
+        type: "TASK_STATUS_CHANGED",
+        priority: NotificationPriority.NORMAL,
+        title: "Task status changed",
+        body: `"${response.name}" is now ${dto.statusAction.replace(/_/g, " ").toLowerCase()}.`,
+        boardId,
+        taskId: dto.taskId,
+        data: { statusAction: dto.statusAction },
+        dedupeKey: (recipientId) =>
+          `task:${dto.taskId}:status:${dto.statusAction}:${response.updatedAt.toISOString()}:${recipientId}`,
+      });
+    }
 
     if (dto.statusAction === TaskStatusAction.DONE) {
       realtimeEventService.emitTaskScheduleUpdated(dto.taskId, response);

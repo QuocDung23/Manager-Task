@@ -14,6 +14,8 @@ import {
   taskCommentRouter,
 } from "./tasks/comment/comment.router";
 import { taskTagRegistry, taskTagRouter } from "./tasks/tag/tag.router";
+import { taskActivityRouter } from "./taskActivity/task-activity.router";
+import { notificationRouter } from "./notification/notification.router";
 
 export const Registries = [
   healthCheckRegistry,
@@ -37,4 +39,6 @@ export const Modules = {
   taskRouter,
   taskCommentRouter,
   taskTagRouter,
+  taskActivityRouter,
+  notificationRouter,
 };

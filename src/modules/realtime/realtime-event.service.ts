@@ -29,7 +29,13 @@ import {
   ProjectMemberAddedPayload,
   ProjectMemberRemovedPayload,
   ProjectMemberRoleUpdatedPayload,
+  TaskActivityCreatedPayload,
+  NotificationCreatedPayload,
+  NotificationReadStateChangedPayload,
+  NotificationReadAllPayload,
 } from "./realtime.types";
+import type { TaskActivityResponse } from "@/modules/taskActivity/task-activity.types";
+import type { NotificationResponse } from "@/modules/notification/notification-inbox.service";
 import type { BoardResponseDto } from "@/modules/board/dtos/responses/board.res";
 import type { BoardMemberResponseDto } from "@/modules/board/dtos/responses/boardMember.res";
 import type { ProjectResponseDto } from "@/modules/projects/dtos/response/project.res";
@@ -38,15 +44,6 @@ import type { AppSocketServer } from "./socket.server";
 import { createRealtimeEnvelope } from "./realtime-envelope";
 import { TagResponseDto } from "@/modules/tasks/tag/dtos/response";
 
-/**
- * Server-side per-board monotonic counter for reorder mutations.
- *
- * Phase 1 của plan: chưa thêm cột `orderVersion` vào schema, nên dùng
- * counter in-memory theo process. Khi scale BE chạy nhiều instance,
- * counter sẽ không đồng bộ giữa các node; vẫn đảm bảo "eventId" là
- * dedupe key chính, còn `orderVersion` chỉ là best-effort local revision.
- * Khi reconnect, FE refetch toàn bộ board list/task nên sẽ tự hồi phục.
- */
 const boardOrderRevision = new Map<string, number>();
 function nextBoardRevision(boardId: string): number {
   const next = (boardOrderRevision.get(boardId) ?? 0) + 1;
@@ -67,10 +64,6 @@ function chainRoomTargets(
   return chain;
 }
 
-/**
- * Service emit realtime event tới các client đang subscribe.
- * Lấy io instance qua `setIO()` khi server bootstrap.
- */
 export class RealtimeEventService {
   private io: AppSocketServer | null = null;
 
@@ -101,6 +94,65 @@ export class RealtimeEventService {
   ): void {
     if (!this.io) return;
     this.io.to(userRoom(userId)).emit(event, payload);
+  }
+
+  emitTaskActivityCreated(activity: TaskActivityResponse): void {
+    const payload: TaskActivityCreatedPayload = createRealtimeEnvelope({
+      actorId: activity.actor?.id,
+      data: { activity },
+    });
+    this.emitToRoom(
+      taskRoom(activity.taskId),
+      "task:activity_created",
+      payload,
+    );
+  }
+
+  emitNotificationCreated(
+    recipientId: string,
+    notification: NotificationResponse,
+  ): void {
+    const payload: NotificationCreatedPayload = createRealtimeEnvelope({
+      actorId: notification.actor?.id,
+      data: { notification },
+    });
+    this.emitToRoom(userRoom(recipientId), "notification:created", payload);
+  }
+
+  emitNotificationReadStateChanged(
+    recipientId: string,
+    notificationId: string,
+    readAt: Date | null,
+  ): void {
+    const payload: NotificationReadStateChangedPayload = createRealtimeEnvelope(
+      {
+        actorId: null,
+        data: {
+          notificationId,
+          readAt: readAt instanceof Date ? readAt.toISOString() : readAt,
+        },
+      },
+    );
+    this.emitToRoom(
+      userRoom(recipientId),
+      "notification:read_state_changed",
+      payload,
+    );
+  }
+
+  emitNotificationReadAll(
+    recipientId: string,
+    before: Date,
+    readAt: Date,
+  ): void {
+    const payload: NotificationReadAllPayload = createRealtimeEnvelope({
+      actorId: null,
+      data: {
+        before: before instanceof Date ? before.toISOString() : before,
+        readAt: readAt instanceof Date ? readAt.toISOString() : readAt,
+      },
+    });
+    this.emitToRoom(userRoom(recipientId), "notification:read_all", payload);
   }
 
   emitTaskCommentCreated(taskId: string, comment: CommentResponseDto) {

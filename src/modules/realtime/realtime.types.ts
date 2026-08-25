@@ -4,6 +4,8 @@ import { TaskResponseDto } from "@/modules/tasks/dtos/response";
 import { TaskLockStatus, TaskStatusAction } from "@prisma/client";
 import type { BoardResponseDto } from "@/modules/board/dtos/responses/board.res";
 import type { BoardMemberResponseDto } from "@/modules/board/dtos/responses/boardMember.res";
+import type { TaskActivityResponse } from "@/modules/taskActivity/task-activity.types";
+import type { NotificationResponse } from "@/modules/notification/notification-inbox.service";
 
 export type RealtimeAck = {
   success: boolean;
@@ -230,6 +232,24 @@ export type UserNotificationPayload = {
   createdAt: Date;
 };
 
+export type TaskActivityCreatedPayload = RealtimeEnvelope<{
+  activity: TaskActivityResponse;
+}>;
+
+export type NotificationCreatedPayload = RealtimeEnvelope<{
+  notification: NotificationResponse;
+}>;
+
+export type NotificationReadStateChangedPayload = RealtimeEnvelope<{
+  notificationId: string;
+  readAt: string | null;
+}>;
+
+export type NotificationReadAllPayload = RealtimeEnvelope<{
+  before: string;
+  readAt: string;
+}>;
+
 export type ServerToClientEvents = {
   "task:comment_created": (payload: TaskCommentCreatedPayload) => void;
   "task:comment_replied": (payload: TaskCommentRepliedPayload) => void;
@@ -273,6 +293,12 @@ export type ServerToClientEvents = {
     payload: ProjectMemberRoleUpdatedPayload,
   ) => void;
   "notification:new": (payload: UserNotificationPayload) => void;
+  "task:activity_created": (payload: TaskActivityCreatedPayload) => void;
+  "notification:created": (payload: NotificationCreatedPayload) => void;
+  "notification:read_state_changed": (
+    payload: NotificationReadStateChangedPayload,
+  ) => void;
+  "notification:read_all": (payload: NotificationReadAllPayload) => void;
 };
 
 export type InterServerEvents = Record<string, never>;

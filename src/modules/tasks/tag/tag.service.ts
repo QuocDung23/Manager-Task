@@ -10,7 +10,7 @@ import {
   TaskRepository,
   TaskWithDetails,
 } from "@/modules/tasks/task.repository";
-import { Prisma, TaskLockStatus } from "@prisma/client";
+import { Prisma, TaskActivityType, TaskLockStatus } from "@prisma/client";
 import {
   AttachTaskTagRequestDto,
   CreateTagRequestDto,
@@ -29,6 +29,7 @@ import {
 import { TaskResponseDto } from "../dtos/response";
 import { TaskTagRepository } from "./tag.repository";
 import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
+import { taskActivityService } from "@/modules/taskActivity/task-activity.service";
 
 const DEFAULT_TAG_COLOR = "#64748b";
 
@@ -248,6 +249,8 @@ export class TaskTagService {
     }
 
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
+    const beforeTask =
+      await this.taskRepository.getTaskByIdWithAssignments(dto.taskId);
     this.assertTaskNotLocked(ctx, "changing task tags");
     if (uniqueTagIds.length > 0) {
       await this.assertAllTagsBelongToBoard({
@@ -271,6 +274,32 @@ export class TaskTagService {
       task: response,
       actorId: actorUserId,
     });
+    const beforeById = new Map(
+      (beforeTask?.taskTags ?? []).map(({ tag }) => [tag.id, tag] as const),
+    );
+    const afterById = new Map(
+      (updated.taskTags ?? []).map(({ tag }) => [tag.id, tag] as const),
+    );
+    for (const [tagId, tag] of afterById) {
+      if (!beforeById.has(tagId)) {
+        await taskActivityService.create({
+          taskId: ctx.taskId,
+          actorId: actorUserId,
+          type: TaskActivityType.TASK_TAG_ADDED,
+          metadata: { tag: { id: tag.id, name: tag.name, color: tag.color } },
+        });
+      }
+    }
+    for (const [tagId, tag] of beforeById) {
+      if (!afterById.has(tagId)) {
+        await taskActivityService.create({
+          taskId: ctx.taskId,
+          actorId: actorUserId,
+          type: TaskActivityType.TASK_TAG_REMOVED,
+          metadata: { tag: { id: tag.id, name: tag.name, color: tag.color } },
+        });
+      }
+    }
     return {
       success: true,
       data: response,
@@ -283,7 +312,7 @@ export class TaskTagService {
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
     this.assertTaskNotLocked(ctx, "changing task tags");
-    await this.getActiveTagInBoardOrThrow({
+    const tag = await this.getActiveTagInBoardOrThrow({
       boardId: ctx.boardId,
       tagId: dto.tagId,
     });
@@ -303,6 +332,12 @@ export class TaskTagService {
       task: response,
       actorId: actorUserId,
     });
+    await taskActivityService.create({
+      taskId: ctx.taskId,
+      actorId: actorUserId,
+      type: TaskActivityType.TASK_TAG_ADDED,
+      metadata: { tag: { id: tag.id, name: tag.name, color: tag.color } },
+    });
     return {
       success: true,
       data: response,
@@ -315,7 +350,7 @@ export class TaskTagService {
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const ctx = await this.getActiveTaskContextOrThrow(dto.taskId);
     this.assertTaskNotLocked(ctx, "changing task tags");
-    await this.getActiveTagInBoardOrThrow({
+    const tag = await this.getActiveTagInBoardOrThrow({
       boardId: ctx.boardId,
       tagId: dto.tagId,
     });
@@ -342,6 +377,12 @@ export class TaskTagService {
       taskId: ctx.taskId,
       task: response,
       actorId: actorUserId,
+    });
+    await taskActivityService.create({
+      taskId: ctx.taskId,
+      actorId: actorUserId,
+      type: TaskActivityType.TASK_TAG_REMOVED,
+      metadata: { tag: { id: tag.id, name: tag.name, color: tag.color } },
     });
     return {
       success: true,
