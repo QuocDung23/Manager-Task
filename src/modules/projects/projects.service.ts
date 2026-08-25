@@ -312,14 +312,38 @@ export class ProjectsService {
       throw new ConflictException("User already in project");
     }
 
-    const member = await this.projectMemberRepository.addMemberToProject(
+    await this.projectMemberRepository.addMemberToProject(
       addMemberDto.userId,
       projectId,
       memberRole.id,
     );
 
-    const memberDto = new ProjectMemberResponseDto(member);
-    const projectDto = new ProjectResponseDto(project as any);
+    const member = await this.projectMemberRepository.findProjectMember(
+      addMemberDto.userId,
+      projectId,
+    );
+    if (!member) {
+      throw new InternalServerException();
+    }
+
+    const refreshedProject = await this.projectsRepository.getProject({
+      id: projectId,
+    });
+    if (!refreshedProject) {
+      throw new InternalServerException();
+    }
+
+    const memberDto = new ProjectMemberResponseDto({
+      ...member,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+      },
+      role: { id: memberRole.id, name: memberRole.name },
+    } as any);
+    const projectDto = new ProjectResponseDto(refreshedProject as any);
 
     try {
       // Fan-out tới user room của member mới + owner + các member ACTIVE hiện tại
@@ -337,12 +361,15 @@ export class ProjectsService {
         recipientUserIds: Array.from(recipientSet),
       });
     } catch (error) {
-      console.error("[realtime] emitProjectMemberAdded failed (HTTP continues)", {
-        projectId,
-        memberId: memberDto.id,
-        actorUserId,
-        error,
-      });
+      console.error(
+        "[realtime] emitProjectMemberAdded failed (HTTP continues)",
+        {
+          projectId,
+          memberId: memberDto.id,
+          actorUserId,
+          error,
+        },
+      );
     }
     await notificationInboxService.createForRecipients({
       recipientIds: [memberDto.userId],

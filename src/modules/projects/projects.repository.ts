@@ -5,6 +5,11 @@ import { ProjectMemberStatus, ProjectStatus } from "@prisma/client";
 type ProjectCreateResult = Prisma.projectsGetPayload<{
   include: {
     user: true;
+    projectMembers: {
+      include: {
+        user: true;
+      };
+    };
   };
 }>;
 
@@ -69,6 +74,18 @@ export class ProjectsRepository {
     return this.prismaService.projects.create({
       include: {
         user: true,
+        projectMembers: {
+          where: {
+            status: ProjectMemberStatus.ACTIVE,
+            deletedAt: null,
+          },
+          include: {
+            user: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
       },
       data: project,
     });
@@ -178,13 +195,27 @@ export class ProjectsRepository {
   }: {
     id: string;
     project: Prisma.projectsUpdateInput;
-  }): Promise<projects> {
+  }): Promise<ProjectWithMembersResult> {
     const { ...data } = project;
     return this.prismaService.projects.update({
       where: {
         id: id,
       },
       data: data,
+      include: {
+        projectMembers: {
+          where: {
+            status: ProjectMemberStatus.ACTIVE,
+            deletedAt: null,
+          },
+          include: {
+            user: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+      },
     });
   }
 
