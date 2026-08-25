@@ -48,16 +48,23 @@ export class BoardRepository {
     skip: number;
     take: number;
   }): Promise<[boards[], number]> {
+    const baseWhere: Prisma.boardsWhereInput = {
+      projectId: projectId,
+      userId: userId,
+      status: status,
+      deletedAt: { equals: null },
+    };
+
+    if (name) {
+      baseWhere.OR = [
+        { name: { contains: name } },
+        { description: { contains: name } },
+      ];
+    }
+
     return Promise.all([
       this.prisma.boards.findMany({
-        where: {
-          projectId: projectId,
-          userId: userId,
-          name: name,
-          status: status,
-
-          deletedAt: { equals: null },
-        },
+        where: baseWhere,
         orderBy: {
           createdAt: "desc",
         },
@@ -65,14 +72,7 @@ export class BoardRepository {
         take,
       }),
       this.prisma.boards.count({
-        where: {
-          projectId: projectId,
-          userId: userId,
-          name: name,
-          status: status,
-
-          deletedAt: { equals: null },
-        },
+        where: baseWhere,
       }),
     ]);
   }
