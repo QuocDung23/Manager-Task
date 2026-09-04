@@ -140,7 +140,7 @@ model users {
   bio     String?
   address String?
   phone   String?
-  avatar  String? @default("https://ui-avatars.com/api/?name=User&background=random")
+  avatar  String? @default("https://ui-avatars.com/api/?name=User&background=3498DB&color=fff&size=256")
   verify  Boolean @default(false)
 
   status UserStatus @default(ACTIVE)
@@ -161,12 +161,11 @@ model users {
   userRoles      userRoles[]
 
   taskAssignments         taskAssignments[]
-  assignedTaskAssignments taskAssignments[] @relation("TaskAssignedBy")
+  assignedTaskAssignments taskAssignments[]    @relation("TaskAssignedBy")
   taskScheduleEvents      taskScheduleEvents[]
   taskActivities          taskActivities[]
-  receivedNotifications  notifications[] @relation("NotificationRecipient")
-  actedNotifications     notifications[] @relation("NotificationActor")
-
+  receivedNotifications   notifications[]      @relation("NotificationRecipient")
+  actedNotifications      notifications[]      @relation("NotificationActor")
 
   taskComments taskComments[]
 
@@ -350,33 +349,33 @@ model lists {
 }
 
 model tasks {
-  id           String           @id @default(uuid())
-  name         String
-  description  String
-  orderTask    Int              @default(0)
-  dueDate      DateTime?        @map("due_date")
-  reminderAt        DateTime?      @map("reminder_at")
-  reminderSentAt    DateTime?      @map("reminder_sent_at")
-  overdueNotifiedAt DateTime?      @map("overdue_notified_at")
-  lockedAt          DateTime?      @map("locked_at")
-  lockStatus        TaskLockStatus @default(UNLOCKED) @map("lock_status")
-  lockReason        String?        @map("lock_reason")
-  rescheduleCount   Int            @default(0) @map("reschedule_count")
-  completedAt       DateTime?      @map("completed_at")
-  listId       String           @map("list_id")
-  list         lists            @relation(fields: [listId], references: [id])
-  status       TaskStatus       @default(ACTIVE)
-  statusAction TaskStatusAction @default(TODO)
-  tagVersion   Int              @default(0) @map("tag_version")
-  assignmentVersion Int            @default(0) @map("assignment_version")
+  id                String           @id @default(uuid())
+  name              String
+  description       String
+  orderTask         Int              @default(0)
+  dueDate           DateTime?        @map("due_date")
+  reminderAt        DateTime?        @map("reminder_at")
+  reminderSentAt    DateTime?        @map("reminder_sent_at")
+  overdueNotifiedAt DateTime?        @map("overdue_notified_at")
+  lockedAt          DateTime?        @map("locked_at")
+  lockStatus        TaskLockStatus   @default(UNLOCKED) @map("lock_status")
+  lockReason        String?          @map("lock_reason")
+  rescheduleCount   Int              @default(0) @map("reschedule_count")
+  completedAt       DateTime?        @map("completed_at")
+  listId            String           @map("list_id")
+  list              lists            @relation(fields: [listId], references: [id])
+  status            TaskStatus       @default(ACTIVE)
+  statusAction      TaskStatusAction @default(TODO)
+  tagVersion        Int              @default(0) @map("tag_version")
+  assignmentVersion Int              @default(0) @map("assignment_version")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  taskAssignments taskAssignments[]
-  taskComments    taskComments[]
-  taskTags        taskTags[]
+  taskAssignments    taskAssignments[]
+  taskComments       taskComments[]
+  taskTags           taskTags[]
   taskScheduleEvents taskScheduleEvents[]
   taskActivities     taskActivities[]
 

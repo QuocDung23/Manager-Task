@@ -4,6 +4,7 @@ import {
   NotFoundException,
   OptionalException,
 } from "@/common";
+import { buildDefaultAvatarUrl } from "@/common/utils";
 import { AuthRepository } from "./auth.repository";
 import { RegisterRequestDto } from "./dtos/requests/register.req";
 import { AccountResDto } from "./dtos/responses/account.res";
@@ -48,7 +49,7 @@ export class AuthService {
     const salt = await genSalt(10);
     const hashedPassword = await hash(registerDto.password, salt);
 
-    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(registerDto.name)}&background=random&color=fff&size=256`;
+    const defaultAvatar = buildDefaultAvatarUrl(registerDto.name);
 
     const account: Prisma.accountsCreateInput = {
       salt: salt,
