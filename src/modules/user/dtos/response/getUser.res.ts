@@ -1,5 +1,5 @@
-import { users } from "@/models"
-import { UserStatus } from "@prisma/client"
+import { getCloudinaryDisplayImageUrl } from "@/common"
+import { UserStatus, users } from "@prisma/client"
 import z from "zod"
 
 export class GetUserResponseDto {
@@ -20,7 +20,7 @@ export class GetUserResponseDto {
         this.name = userInfo.name
         this.email = userInfo.email
         this.bio = userInfo.bio 
-        this.avatar = userInfo.avatar
+        this.avatar = getCloudinaryDisplayImageUrl(userInfo.avatar)
 
         this.updatedAt = userInfo.updatedAt
         this.createddAt = userInfo.createdAt

@@ -20,11 +20,12 @@ export const validateRequestMiddleware = (schema: ZodValidationSchema) => {
 			for (const key in schema) {
 				const zodSchema: ZodSchema | ZodSchema[] | undefined =
 					schema[key as keyof ZodValidationSchema];
+				const requestValue = (req as any)[key];
 				if (zodSchema && !Array.isArray(zodSchema)) {
-					zodSchema.parse(req[key as keyof Request]);
+					zodSchema.parse(requestValue);
 				} else {
 					(zodSchema as ZodSchema[]).forEach((zodSchema) => {
-						zodSchema.parse(req[key as keyof Request]);
+						zodSchema.parse(requestValue);
 					});
 				}
 			}

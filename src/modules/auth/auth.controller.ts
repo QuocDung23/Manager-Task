@@ -8,8 +8,10 @@ import {
   RegisterRequestDto,
   SendOtpRequestDto,
 } from "./dtos/requests";
-import { VerifyRequestDto } from "./dtos/requests/verifyOtp.req";
+import { VerifyRequestDto } from "./dtos/requests/verifyAcc.req";
 import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
+import { ChangePasswordRequestDto } from "../user/dtos";
+import { ResetPasswordRequestDto } from "./dtos/requests/resetPass.req";
 
 export class AuthController {
   constructor(private readonly authService = new AuthService()) {}
@@ -40,22 +42,16 @@ export class AuthController {
       return new HttpResponseDto().exception(res, result);
     }
 
-    if(result.data) {
-      res.cookie('accessToken',
-        result.data.accessToken,
-        {
-          httpOnly: true,
-          maxAge: 30 * 60 * 1000,
-        }
-      )
-      res.cookie(
-        'refreshToken',
-        result.data.refreshToken,
-        {
-          httpOnly: true,
-          maxAge: 7 * 24 * 60 * 60 * 1000
-        }
-      )
+    if (result.data) {
+      res.cookie("accessToken", result.data.accessToken, {
+        httpOnly: true,
+        maxAge: 30 * 60 * 1000,
+      });
+      res.cookie("refreshToken", result.data.refreshToken, {
+        httpOnly: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: "/",
+      });
     }
 
     return new HttpResponseDto().success(res, result);
@@ -83,21 +79,50 @@ export class AuthController {
     const myInformation = (req as any).user as MyInfomationResDto;
     const result = await this.authService.refreshToken(myInformation);
     if (result instanceof Exception) {
-        return new HttpResponseDto().exception(res, result);
+      return new HttpResponseDto().exception(res, result);
     }
 
     if (result.data) {
-      res.cookie('accessToken', result.data.accessToken, {
+      res.cookie("accessToken", result.data.accessToken, {
         httpOnly: true,
-        maxAge: 30 * 60 * 1000, 
+        maxAge: 30 * 60 * 1000,
       });
-      res.cookie('refreshToken', result.data.refreshToken, {
+      res.cookie("refreshToken", result.data.refreshToken, {
         httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000, 
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: "/",
       });
     }
 
     return new HttpResponseDto().created(res, result);
-}
+  }
 
+  async verifyOtp(req: Request, res: Response): Promise<Response> {
+    const dto = new VerifyRequestDto(req.body);
+    const result = await this.authService.verifyOtp(dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async resetPassword(req: Request, res: Response): Promise<Response> {
+    const dto = new ResetPasswordRequestDto(req.body);
+    const result = await this.authService.resetPassword(dto);
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async logout(req: Request, res: Response): Promise<Response> {
+    const userId = (req as any).user.id;
+    const result = await this.authService.logout(userId);
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
+    return new HttpResponseDto().success(res, result);
+  }
 }

@@ -7,12 +7,19 @@ import {
   GetUserByUserIdRequestDto,
   GetUserResponseDto,
   GetUsersRequestDto,
+  MyInfomationResDto,
+  UpdateMyProfileRequestDto,
+  UpdateUserByUserIdRequestDto,
 } from "./dtos";
 import { UserRepository } from "./user.repository";
 import { PaginationUtils } from "@/common/utils/pagination.utils";
+import { CloudinaryService } from "@/common/service/cloudinary.service";
 
 export class UserServicer {
-  constructor(private readonly userRepository = new UserRepository()) {}
+  constructor(
+    private readonly userRepository = new UserRepository(),
+    private readonly cloudinaryService = new CloudinaryService(),
+  ) {}
 
   async getUserByUserId(
     getUserByUserIdRequestDto: GetUserByUserIdRequestDto,
@@ -36,16 +43,18 @@ export class UserServicer {
     getUsersRequestDto: GetUsersRequestDto,
     paginationDto: PaginationDto,
   ): Promise<HttpResponseBodySuccessDto<GetUserResponseDto[]>> {
-    const { name, status } = getUsersRequestDto;
+    const { name, email, status } = getUsersRequestDto;
     const paginationUtils = new PaginationUtils().extractSkipTakeFromPagination(
       paginationDto,
     );
+    const { skip, take } = paginationUtils;
 
     const [user, totalUser] = await this.userRepository.findUsers({
       name: name as string,
+      email: email as string,
       status: status,
-      skip: 1,
-      take: 10,
+      skip,
+      take,
     });
 
     const userRespone = user.map((user) => new GetUserResponseDto(user));
@@ -57,7 +66,91 @@ export class UserServicer {
     };
   }
 
-  async getMyInfo() {
-	
+  async getMyInfo(
+    userId: string,
+  ): Promise<HttpResponseBodySuccessDto<MyInfomationResDto>> {
+    const user = await this.userRepository.findUser({ userId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    return {
+      success: true,
+      data: new MyInfomationResDto(user),
+    };
+  }
+
+  async updateAvatar(userId: string, file: Express.Multer.File) {
+    const user = await this.userRepository.findUser({ userId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    const updateAvatar = await this.cloudinaryService.uploadAvatar(
+      file,
+      userId,
+    );
+
+    const updatedUser = await this.userRepository.updateUser({
+      userId,
+      user: {
+        avatar: updateAvatar.secure_url,
+      },
+    });
+
+    return {
+      success: true,
+      data: { avatar: updatedUser.avatar },
+    };
+  }
+
+  async updateMyProfile(
+    userId: string,
+    dto: UpdateMyProfileRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<MyInfomationResDto>> {
+    const user = await this.userRepository.findUser({ userId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    const updatedUser = await this.userRepository.updateUser({
+      userId,
+      user: {
+        name: dto.name,
+        bio: dto.bio,
+        address: dto.address,
+        phone: dto.phone,
+      },
+    });
+
+    return {
+      success: true,
+      data: new MyInfomationResDto(updatedUser),
+    };
+  }
+
+  async updateUserByUserId(
+    targetUserId: string,
+    dto: UpdateUserByUserIdRequestDto,
+  ): Promise<HttpResponseBodySuccessDto<MyInfomationResDto>> {
+    const user = await this.userRepository.findUser({ userId: targetUserId });
+    if (!user) {
+      throw new NotFoundException("userId");
+    }
+
+    const updatedUser = await this.userRepository.updateUser({
+      userId: targetUserId,
+      user: {
+        name: dto.name,
+        bio: dto.bio,
+        address: dto.address,
+        phone: dto.phone,
+      },
+    });
+
+    return {
+      success: true,
+      data: new MyInfomationResDto(updatedUser),
+    };
   }
 }

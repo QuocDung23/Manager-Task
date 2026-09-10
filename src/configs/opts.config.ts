@@ -1,4 +1,3 @@
-
 export const otpsConfig = {
-    optExpires: Number(process.env.OPT_EXPIRES) || 5,
-}
+  optExpires: Number(process.env.OPT_EXPIRES) || 1,
+};

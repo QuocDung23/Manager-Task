@@ -47,9 +47,11 @@ export class OtpService {
   async verifyOtp({
     otp,
     userId,
+    deleteOtpAfterVerify
   }: {
     otp: string;
     userId: string;
+    deleteOtpAfterVerify?: boolean;
   }): Promise<boolean | Exception> {
     const otpRecord = await this.otpRepository.findOtp({
       otp: otp,
@@ -63,8 +65,11 @@ export class OtpService {
       await this.otpRepository.deleteOtp({ otpId: otpRecord.id });
       throw new OptionalException(StatusCodes.UNAUTHORIZED, "Otp expired");
     }
+    const shouldDeleteOtp = deleteOtpAfterVerify ?? true
+    if(shouldDeleteOtp) {
+      await this.otpRepository.deleteOtp({ otpId: otpRecord.id });
+    }
 
-    await this.otpRepository.deleteOtp({ otpId: otpRecord.id });
     return true;
   }
 }

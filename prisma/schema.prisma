@@ -18,12 +18,12 @@ generator zod {
   output                           = "../src/models" // default is ./generated/zod
   useMultipleFiles                 = true // default is false
   writeBarrelFiles                 = true // default is true
-  createInputTypes                 = true // default is false
+  createInputTypes                 = false // default is false
   createModelTypes                 = true // default is false
   addInputTypeValidation           = true // default is false
-  addIncludeType                   = true // default is false
-  addSelectType                    = true // default is false
-  validateWhereUniqueInput         = true // default is false
+  addIncludeType                   = false // default is false
+  addSelectType                    = false // default is false
+  validateWhereUniqueInput         = false // default is false
   createOptionalDefaultValuesTypes = true // default is false
   createRelationValuesTypes        = true // default is false
   createPartialTypes               = true // default is false
@@ -34,8 +34,103 @@ generator zod {
 }
 
 enum UserStatus {
-  ACTIVE @map("active")
-  LOCKED @map("locked")
+  ACTIVE  @map("active")
+  LOCKED  @map("locked")
+  PENDING @map("pending")
+}
+
+enum ProjectStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum BoardStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum ListStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum TaskStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum TaskStatusAction {
+  TODO        @map("todo")
+  IN_PROGRESS @map("in_progress")
+  IN_REVIEW   @map("in_review")
+  DONE        @map("done")
+  PAUSED      @map("paused")
+  FIXED       @map("fixed")
+  CANCELLED   @map("cancelled")
+}
+
+enum TaskLockStatus {
+  UNLOCKED       @map("unlocked")
+  OVERDUE_LOCKED @map("overdue_locked")
+  MANUAL_LOCKED  @map("manual_locked")
+}
+
+enum TaskScheduleEventType {
+  SCHEDULED        @map("scheduled")
+  RESCHEDULED      @map("rescheduled")
+  SCHEDULE_CLEARED @map("schedule_cleared")
+  REMINDER_SENT    @map("reminder_sent")
+  OVERDUE_LOCKED   @map("overdue_locked")
+  UNLOCKED         @map("unlocked")
+  COMPLETED        @map("completed")
+}
+
+enum TagStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum ProjectMemberStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum BoardMemberStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum RoleStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum PermissionStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+enum TaskActivityType {
+  TASK_CREATED
+  TASK_NAME_CHANGED
+  TASK_DESCRIPTION_CHANGED
+  TASK_ASSIGNEE_ADDED
+  TASK_ASSIGNEE_REMOVED
+  TASK_TAG_ADDED
+  TASK_TAG_REMOVED
+  TASK_SCHEDULE_SET
+  TASK_RESCHEDULED
+  TASK_SCHEDULE_CLEARED
+  TASK_DUE_SOON
+  TASK_OVERDUE_LOCKED
+  TASK_UNLOCKED
+  TASK_STATUS_CHANGED
+}
+
+enum NotificationPriority {
+  NORMAL
+  DIRECT
+  URGENT
 }
 
 model users {
@@ -45,7 +140,7 @@ model users {
   bio     String?
   address String?
   phone   String?
-  avatar  String?
+  avatar  String? @default("https://ui-avatars.com/api/?name=User&background=3498DB&color=fff&size=256")
   verify  Boolean @default(false)
 
   status UserStatus @default(ACTIVE)
@@ -54,10 +149,25 @@ model users {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  accounts accounts?
+  accounts       accounts?
   // socialAccounts socialAccounts?
-  tokens   tokens[]
-  otp     otps?
+  tokens         tokens[]
+  otp            otps?
+  project        projects[]
+  board          boards[]
+  // socialAccounts socialAccounts[]
+  projectMembers projectMembers[]
+  boardMembers   boardMembers[]
+  userRoles      userRoles[]
+
+  taskAssignments         taskAssignments[]
+  assignedTaskAssignments taskAssignments[]    @relation("TaskAssignedBy")
+  taskScheduleEvents      taskScheduleEvents[]
+  taskActivities          taskActivities[]
+  receivedNotifications   notifications[]      @relation("NotificationRecipient")
+  actedNotifications      notifications[]      @relation("NotificationActor")
+
+  taskComments taskComments[]
 
   @@map("users")
 }
@@ -73,12 +183,68 @@ model accounts {
 }
 
 model tokens {
-  id           String @default(uuid())
-  userId       String @unique @map("user_id")
-  user         users  @relation(fields: [userId], references: [id])
-  refreshToken String @unique @map("refresh_token")
+  id           String    @default(uuid())
+  userId       String    @unique @map("user_id")
+  user         users     @relation(fields: [userId], references: [id])
+  refreshToken String    @unique @map("refresh_token")
+  deleteAt     DateTime?
 
   @@map("tokens")
+}
+
+model roles {
+  id          String     @id @default(uuid())
+  name        String     @unique @map("role_name")
+  description String
+  status      RoleStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  userRoles       userRoles[]
+  rolePermissions rolePermissions[]
+  projectMembers  projectMembers[]
+  boardMembers    boardMembers[]
+
+  @@map("roles")
+}
+
+model userRoles {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   users  @relation(fields: [userId], references: [id])
+  roleId String @map("role_id")
+  role   roles  @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@map("userRoles")
+}
+
+model permissions {
+  id          String           @id @default(uuid())
+  name        String           @unique @map("permission_name")
+  description String
+  status      PermissionStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("update_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  rolePermissions rolePermissions[]
+
+  @@map("permissions")
+}
+
+model rolePermissions {
+  id           String      @id @default(uuid())
+  roleId       String      @map("role_id")
+  role         roles       @relation(fields: [roleId], references: [id])
+  permissionId String      @map("permission_id")
+  permission   permissions @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@map("rolePermissions")
 }
 
 model otps {
@@ -89,4 +255,269 @@ model otps {
   expiresAt DateTime @map("expires_at")
 
   @@map("otps")
+}
+
+model projects {
+  id          String        @id @default(uuid())
+  name        String
+  description String
+  userId      String        @map("user_id")
+  user        users         @relation(fields: [userId], references: [id])
+  status      ProjectStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  projectMembers projectMembers[]
+  board          boards[]
+
+  @@map("projects")
+}
+
+model projectMembers {
+  id        String              @id @default(uuid())
+  userId    String              @map("user_id")
+  user      users               @relation(fields: [userId], references: [id])
+  projectId String              @map("project_id")
+  project   projects            @relation(fields: [projectId], references: [id])
+  roleId    String              @map("role_id")
+  role      roles               @relation(fields: [roleId], references: [id])
+  status    ProjectMemberStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("projectMembers")
+}
+
+model boards {
+  id          String      @id @default(uuid())
+  name        String
+  description String
+  projectId   String      @map("project_id")
+  project     projects    @relation(fields: [projectId], references: [id])
+  status      BoardStatus @default(ACTIVE)
+  userId      String      @map("user_id")
+  user        users       @relation(fields: [userId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  boardMembers boardMembers[]
+  lists        lists[]
+  tags         tags[]
+
+  @@map("boards")
+}
+
+model boardMembers {
+  id      String            @id @default(uuid())
+  userId  String            @map("user_id")
+  user    users             @relation(fields: [userId], references: [id])
+  boardId String            @map("board_id")
+  board   boards            @relation(fields: [boardId], references: [id])
+  roleId  String            @map("role_id")
+  role    roles             @relation(fields: [roleId], references: [id])
+  status  BoardMemberStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("boardMembers")
+}
+
+model lists {
+  id          String     @id @default(uuid())
+  name        String
+  description String
+  order       Int        @default(0)
+  boardId     String     @map("board_id")
+  board       boards     @relation(fields: [boardId], references: [id])
+  status      ListStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tasks tasks[]
+
+  @@map("lists")
+}
+
+model tasks {
+  id                String           @id @default(uuid())
+  name              String
+  description       String
+  orderTask         Int              @default(0)
+  dueDate           DateTime?        @map("due_date")
+  reminderAt        DateTime?        @map("reminder_at")
+  reminderSentAt    DateTime?        @map("reminder_sent_at")
+  overdueNotifiedAt DateTime?        @map("overdue_notified_at")
+  lockedAt          DateTime?        @map("locked_at")
+  lockStatus        TaskLockStatus   @default(UNLOCKED) @map("lock_status")
+  lockReason        String?          @map("lock_reason")
+  rescheduleCount   Int              @default(0) @map("reschedule_count")
+  completedAt       DateTime?        @map("completed_at")
+  listId            String           @map("list_id")
+  list              lists            @relation(fields: [listId], references: [id])
+  status            TaskStatus       @default(ACTIVE)
+  statusAction      TaskStatusAction @default(TODO)
+  tagVersion        Int              @default(0) @map("tag_version")
+  assignmentVersion Int              @default(0) @map("assignment_version")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  taskAssignments    taskAssignments[]
+  taskComments       taskComments[]
+  taskTags           taskTags[]
+  taskScheduleEvents taskScheduleEvents[]
+  taskActivities     taskActivities[]
+
+  @@index([dueDate, deletedAt])
+  @@index([lockStatus, dueDate])
+  @@index([reminderSentAt, dueDate])
+  @@map("tasks")
+}
+
+model taskActivities {
+  id        String           @id @default(uuid())
+  taskId    String           @map("task_id")
+  task      tasks            @relation(fields: [taskId], references: [id])
+  actorId   String?          @map("actor_id")
+  actor     users?           @relation(fields: [actorId], references: [id])
+  type      TaskActivityType
+  metadata  Json?
+  dedupeKey String?          @map("dedupe_key")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@unique([taskId, dedupeKey])
+  @@index([taskId, createdAt, id])
+  @@map("taskActivities")
+}
+
+model notifications {
+  id          String               @id @default(uuid())
+  recipientId String               @map("recipient_id")
+  recipient   users                @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  actorId     String?              @map("actor_id")
+  actor       users?               @relation("NotificationActor", fields: [actorId], references: [id])
+  type        String
+  priority    NotificationPriority @default(NORMAL)
+  title       String
+  body        String
+  projectId   String?              @map("project_id")
+  boardId     String?              @map("board_id")
+  taskId      String?              @map("task_id")
+  commentId   String?              @map("comment_id")
+  data        Json?
+  dedupeKey   String               @map("dedupe_key")
+  readAt      DateTime?            @map("read_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  @@unique([recipientId, dedupeKey])
+  @@index([recipientId, createdAt, id])
+  @@index([recipientId, readAt, createdAt])
+  @@map("notifications")
+}
+
+model taskScheduleEvents {
+  id      String                @id @default(uuid())
+  taskId  String                @map("task_id")
+  task    tasks                 @relation(fields: [taskId], references: [id])
+  actorId String?               @map("actor_id")
+  actor   users?                @relation(fields: [actorId], references: [id])
+  type    TaskScheduleEventType
+
+  oldDueDate DateTime? @map("old_due_date")
+  newDueDate DateTime? @map("new_due_date")
+  reason     String?
+  metadata   Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([taskId, createdAt])
+  @@index([actorId])
+  @@map("taskScheduleEvents")
+}
+
+model tags {
+  id             String    @id @default(uuid())
+  boardId        String    @map("board_id")
+  board          boards    @relation(fields: [boardId], references: [id])
+  name           String
+  nameNormalized String    @map("name_normalized")
+  color          String    @default("#64748b")
+  status         TagStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  taskTags taskTags[]
+
+  @@unique([boardId, nameNormalized])
+  @@index([boardId, deletedAt])
+  @@index([status])
+  @@map("tags")
+}
+
+model taskTags {
+  id     String @id @default(uuid())
+  taskId String @map("task_id")
+  task   tasks  @relation(fields: [taskId], references: [id])
+  tagId  String @map("tag_id")
+  tag    tags   @relation(fields: [tagId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([taskId, tagId])
+  @@index([taskId, deletedAt])
+  @@index([tagId, deletedAt])
+  @@map("taskTags")
+}
+
+model taskAssignments {
+  id           String  @id @default(uuid())
+  taskId       String  @map("task_id")
+  task         tasks   @relation(fields: [taskId], references: [id])
+  userId       String  @map("user_id")
+  user         users   @relation(fields: [userId], references: [id])
+  assignedById String? @map("assigned_by_id")
+  assignedBy   users?  @relation("TaskAssignedBy", fields: [assignedById], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([taskId, userId])
+  @@map("taskAssignments")
+}
+
+model taskComments {
+  id              String         @id @default(uuid())
+  taskId          String         @map("task_id")
+  task            tasks          @relation(fields: [taskId], references: [id])
+  userId          String         @map("user_id")
+  user            users          @relation(fields: [userId], references: [id])
+  parentCommentId String?        @map("parent_comment_id")
+  parentComment   taskComments?  @relation("TaskCommentReplies", fields: [parentCommentId], references: [id])
+  replies         taskComments[] @relation("TaskCommentReplies")
+  content         String
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([taskId, parentCommentId, deletedAt, createdAt])
+  @@index([parentCommentId, deletedAt, createdAt])
+  @@index([userId])
+  @@map("taskComments")
 }

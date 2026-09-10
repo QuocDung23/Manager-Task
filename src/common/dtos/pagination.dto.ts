@@ -6,11 +6,11 @@ export class PaginationDto {
 
 	constructor(data: Partial<PaginationDto>) {
 		this.page = Number( data?.page ?? 1)
-		this.limit = Number( data?.limit ?? 10)
+		this.limit = Number( data?.limit ?? 12)
 	}
 }
 
 export const paginationSchema = {
 	page: z.coerce.number().int().positive().optional().default(1),
-	limit: z.coerce.number().int().positive().optional().default(10)
+	limit: z.coerce.number().int().positive().optional().default(12)
 }

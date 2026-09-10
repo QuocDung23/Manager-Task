@@ -15,13 +15,21 @@ import {
   sendOtpRequestSchema,
   sendOtpRequestValidationSchema,
 } from "./dtos/requests";
-import { loginResponseDtoSchema } from "./dtos/responses";
+import { loginResponseDtoSchema, logoutResponseSchema } from "./dtos/responses";
 import z from "zod";
 import {
   verifyRequestSchema,
   verifyRequestValidationSchema,
-} from "./dtos/requests/verifyOtp.req";
+} from "./dtos/requests/verifyAcc.req";
 import authMiddleware from "@/common/middlewares/auth.middleware";
+import {
+  resetPasswordRequestSchema,
+  resetPasswordRequestValidationSchema,
+} from "./dtos/requests/resetPass.req";
+import {
+  resetPasswordResponseSchema,
+  verifyOtpResponseSchema,
+} from "./dtos/responses";
 
 export const authRegistry = new OpenAPIRegistry();
 
@@ -61,13 +69,13 @@ router.post(
 
 authRegistry.registerPath({
   method: "post",
-  path: "/auth/sendOtp",
+  path: "/auth/otp",
   tags: ["Auth"],
   request: sendOtpRequestSchema,
   responses: createApiResponse(z.null(), "Success"),
 });
 router.post(
-  "/sendOtp",
+  "/otp",
   validateRequestMiddleware(sendOtpRequestValidationSchema),
   authController.sendOtp,
 );
@@ -86,15 +94,61 @@ router.post(
 );
 
 authRegistry.registerPath({
-	method: 'post',
-	path: '/auth/refresh-token',
-	tags: ['Auth'],
-	responses: createApiResponse(loginResponseDtoSchema, 'Success', StatusCodes.CREATED),
+  method: "post",
+  path: "/auth/refresh-token",
+  tags: ["Auth"],
+  responses: createApiResponse(
+    loginResponseDtoSchema,
+    "Success",
+    StatusCodes.CREATED,
+  ),
 });
 router.post(
-	'/refresh-token',
-	authMiddleware.verifyRefreshToken,
-	authController.refreshToken,
+  "/refresh-token",
+  authMiddleware.verifyRefreshToken,
+  authController.refreshToken,
 );
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/otp/verification",
+  tags: ["Auth"],
+  request: verifyRequestSchema,
+  responses: createApiResponse(
+    verifyOtpResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.post(
+  "/otp/verification",
+  validateRequestMiddleware(verifyRequestValidationSchema),
+  authController.verifyOtp,
+);
+
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/password-reset",
+  tags: ["Auth"],
+  request: resetPasswordRequestSchema,
+  responses: createApiResponse(
+    resetPasswordResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.post(
+  "/password-reset",
+  validateRequestMiddleware(resetPasswordRequestValidationSchema),
+  authController.resetPassword,
+);
+
+authRegistry.registerPath({
+  method: "post",
+  path: "/auth/logout",
+  tags: ["Auth"],
+  security: [{ bearerAuth: [] }],
+  responses: createApiResponse(logoutResponseSchema, "Success", StatusCodes.OK),
+});
+router.post("/logout", authMiddleware.verifyAccessToken, authController.logout);
 
 export const authRouter = router;

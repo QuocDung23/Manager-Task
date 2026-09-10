@@ -1,0 +1,123 @@
+import { boardMembers, BoardMemberStatus, Prisma } from "@prisma/client";
+import { PrismaService } from "../data/prisma.client";
+
+export class BoardMemberRepository {
+  constructor(private readonly prisma = new PrismaService()) {}
+
+  addMemberOfBoard(
+    userId: string,
+    boardId: string,
+    roleId: string,
+  ): Promise<boardMembers> {
+    return this.prisma.boardMembers.create({
+      data: {
+        userId,
+        boardId,
+        roleId,
+      },
+    });
+  }
+
+  async checkMemberOfBoard(boardId: string, userId: string): Promise<boolean> {
+    const member = await this.prisma.boardMembers.findFirst({
+      where: {
+        boardId,
+        userId,
+        status: BoardMemberStatus.ACTIVE,
+        deletedAt: null,
+      },
+    });
+    return !!member;
+  }
+
+  /**
+   * Lấy danh sách boardMembers ACTIVE (chưa soft delete) của board,
+   * có userId nằm trong tập `userIds`.
+   *
+   * Trả về các bản ghi thoả mãn điều kiện; service sẽ đối chiếu length để biết
+   * có user nào không thuộc board hay không.
+   */
+  getActiveBoardMembersByUserIds(
+    boardId: string,
+    userIds: string[],
+  ): Promise<boardMembers[]> {
+    if (!userIds || userIds.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.prisma.boardMembers.findMany({
+      where: {
+        boardId,
+        userId: { in: userIds },
+        status: BoardMemberStatus.ACTIVE,
+        deletedAt: null,
+      },
+    });
+  }
+
+  getActiveBoardMembersWithUser(boardId: string): Promise<
+    Array<
+      boardMembers & {
+        user: {
+          id: string;
+          name: string;
+          email: string;
+          avatar: string | null;
+        };
+      }
+    >
+  > {
+    return this.prisma.boardMembers.findMany({
+      where: {
+        boardId,
+        status: BoardMemberStatus.ACTIVE,
+        deletedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    }) as any;
+  }
+
+  getActiveBoardMemberWithUser(
+    boardId: string,
+    userId: string,
+  ): Promise<
+    | (boardMembers & {
+        user: {
+          id: string;
+          name: string;
+          email: string;
+          avatar: string | null;
+        };
+      })
+    | null
+  > {
+    return this.prisma.boardMembers.findFirst({
+      where: {
+        boardId,
+        userId,
+        status: BoardMemberStatus.ACTIVE,
+        deletedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+    }) as any;
+  }
+}

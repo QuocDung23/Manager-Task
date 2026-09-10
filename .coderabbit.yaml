@@ -1,0 +1,20 @@
+reviews:
+  path_filters:
+    # Bỏ qua các file lock và cấu hình ít thay đổi logic
+    - "!package-lock.json"
+    - "!.env.example"
+    - "!.gitignore"
+    - "!tsconfig.json"
+    
+    # Bỏ qua các file sinh tự động của database
+    - "!prisma/migrations/**"
+    - "!prisma/schema.prisma"
+    
+    # Bỏ qua các file thiết lập API Document (nếu bạn thấy không cần review logic ở đây)
+    - "!src/swagger/**"
+    
+    # Bỏ qua các DTOs, interfaces và Exceptions vì chúng mang tính định nghĩa chuẩn
+    - "!src/common/dtos/**"
+    - "!src/common/exceptions/**"
+    - "!src/common/interface/**"
+    - "!src/modules/**/dtos/**"
