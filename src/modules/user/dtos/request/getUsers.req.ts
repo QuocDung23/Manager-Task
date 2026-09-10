@@ -16,7 +16,7 @@ export class GetUsersRequestDto {
 
 export const getUsersRequestQuery = z.object({
   name: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().optional(),
   status: z.enum(UserStatus).optional(),
 });
 

@@ -32,6 +32,13 @@ export class UserRepository {
     const where: Prisma.usersWhereInput = {
       ...(status !== undefined ? { status } : {}),
       ...(orConditions.length > 0 ? { OR: orConditions } : {}),
+      userRoles: {
+        none: {
+          role: {
+            name: "SUPER_ADMIN",
+          },
+        },
+      },
     };
 
     return Promise.all([

@@ -49,6 +49,7 @@ userRegistry.registerPath({
 
 router.get(
   "/",
+  authMiddleware.verifyAccessToken,
   validateRequestMiddleware(getUsersRequestValidationSchema),
   userController.getAllUsers,
 );
