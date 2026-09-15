@@ -5,6 +5,7 @@ export class CreateTaskRequestDto {
   listId: string;
   name: string;
   description?: string;
+  startDate?: Date;
   dueDate?: Date;
   reminderAt?: Date;
 
@@ -12,6 +13,7 @@ export class CreateTaskRequestDto {
     this.listId = data.listId;
     this.name = data.name;
     this.description = data.description;
+    this.startDate = data.startDate ? new Date(data.startDate) : undefined;
     this.dueDate = data.dueDate ? new Date(data.dueDate) : undefined;
     this.reminderAt = data.reminderAt ? new Date(data.reminderAt) : undefined;
   }
@@ -27,6 +29,7 @@ export const createTaskRequestBodySchema = z
   .object({
     name: z.string().min(1).max(255),
     description: z.string().max(2000).optional(),
+    startDate: z.coerce.date().optional(),
     dueDate: z.coerce.date().optional(),
     reminderAt: z.coerce.date().optional(),
   })

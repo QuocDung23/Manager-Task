@@ -83,7 +83,11 @@ export class TaskService {
     );
   }
 
-  private assertValidSchedule(dueDate: Date, reminderAt?: Date | null): void {
+  private assertValidSchedule(
+    startDate: Date | null | undefined,
+    dueDate: Date,
+    reminderAt?: Date | null,
+  ): void {
     const now = new Date();
     if (Number.isNaN(dueDate.getTime())) {
       throw new BadRequest("dueDate is invalid");
@@ -91,6 +95,17 @@ export class TaskService {
     if (dueDate.getTime() <= now.getTime()) {
       throw new BadRequest("dueDate must be in the future");
     }
+
+    // Validate startDate: must be before or equal to dueDate, valid date
+    if (startDate) {
+      if (Number.isNaN(startDate.getTime())) {
+        throw new BadRequest("startDate is invalid");
+      }
+      if (startDate.getTime() > dueDate.getTime()) {
+        throw new BadRequest("startDate must be before dueDate");
+      }
+    }
+
     if (reminderAt) {
       if (Number.isNaN(reminderAt.getTime())) {
         throw new BadRequest("reminderAt is invalid");
@@ -161,7 +176,14 @@ export class TaskService {
       throw new BadRequest("reminderAt requires dueDate");
     }
     if (createTaskDto.dueDate) {
-      this.assertValidSchedule(createTaskDto.dueDate, createTaskDto.reminderAt);
+      this.assertValidSchedule(
+        createTaskDto.startDate,
+        createTaskDto.dueDate,
+        createTaskDto.reminderAt,
+      );
+    } else if (createTaskDto.startDate) {
+      // startDate requires dueDate
+      throw new BadRequest("startDate requires dueDate");
     }
 
     // Resolve boardId from server-side list data
@@ -182,6 +204,7 @@ export class TaskService {
       name: createTaskDto.name,
       description: createTaskDto.description ?? "",
       orderTask,
+      startDate: createTaskDto.startDate ?? null,
       dueDate: createTaskDto.dueDate,
       reminderAt: createTaskDto.reminderAt ?? null,
       list: { connect: { id: createTaskDto.listId } },
@@ -193,6 +216,7 @@ export class TaskService {
             actorId: actorUserId,
             newDueDate: createTaskDto.dueDate,
             metadata: {
+              startDate: createTaskDto.startDate?.toISOString() ?? null,
               reminderAt: createTaskDto.reminderAt?.toISOString() ?? null,
             },
           }
@@ -228,6 +252,8 @@ export class TaskService {
         actorId: actorUserId,
         type: TaskActivityType.TASK_SCHEDULE_SET,
         metadata: {
+          oldStartDate: null,
+          newStartDate: createTaskDto.startDate?.toISOString() ?? null,
           oldDueDate: null,
           newDueDate: createTaskDto.dueDate.toISOString(),
           oldReminderAt: null,
@@ -775,7 +801,7 @@ export class TaskService {
     }
 
     const reason = dto.reason?.trim();
-    this.assertValidSchedule(dto.dueDate, dto.reminderAt);
+    this.assertValidSchedule(dto.startDate, dto.dueDate, dto.reminderAt);
 
     const isLocked = task.lockStatus !== TaskLockStatus.UNLOCKED;
     if (isLocked && !reason) {
@@ -789,12 +815,16 @@ export class TaskService {
 
     const updatedTask = await this.taskRepository.updateTaskSchedule({
       taskId: dto.taskId,
+      // Pass undefined (not null) for unset startDate so we keep the existing value.
+      // Pass null only when the caller explicitly wants to clear it.
+      startDate: dto.startDate === undefined ? undefined : dto.startDate ?? null,
       dueDate: dto.dueDate,
       reminderAt: dto.reminderAt ?? null,
       actorId: actorUserId,
       reason,
       eventType,
       oldDueDate: task.dueDate,
+      oldStartDate: task.startDate,
       incrementRescheduleCount: eventType === TaskScheduleEventType.RESCHEDULED,
     });
     if (!updatedTask) {
@@ -810,6 +840,8 @@ export class TaskService {
           ? TaskActivityType.TASK_RESCHEDULED
           : TaskActivityType.TASK_SCHEDULE_SET,
       metadata: {
+        oldStartDate: task.startDate?.toISOString() ?? null,
+        newStartDate: dto.startDate?.toISOString() ?? null,
         oldDueDate: task.dueDate?.toISOString() ?? null,
         newDueDate: dto.dueDate.toISOString(),
         oldReminderAt: task.reminderAt?.toISOString() ?? null,
@@ -825,6 +857,7 @@ export class TaskService {
         body: `Task "${response.name}" đã được đổi deadline.`,
         data: {
           taskId: dto.taskId,
+          startDate: dto.startDate?.toISOString() ?? null,
           dueDate: dto.dueDate.toISOString(),
           reminderAt: dto.reminderAt?.toISOString() ?? null,
         },
@@ -838,7 +871,10 @@ export class TaskService {
         body: `"${response.name}" has a new due date.`,
         boardId: await this.resolveBoardIdByTaskId(dto.taskId),
         taskId: dto.taskId,
-        data: { dueDate: dto.dueDate.toISOString() },
+        data: {
+          startDate: dto.startDate?.toISOString() ?? null,
+          dueDate: dto.dueDate.toISOString(),
+        },
         dedupeKey: (recipientId) =>
           `task:${dto.taskId}:rescheduled:${response.rescheduleCount}:${recipientId}`,
       });
@@ -851,6 +887,7 @@ export class TaskService {
         body: `Task "${response.name}" đã có deadline mới.`,
         data: {
           taskId: dto.taskId,
+          startDate: dto.startDate?.toISOString() ?? null,
           dueDate: dto.dueDate.toISOString(),
           reminderAt: dto.reminderAt?.toISOString() ?? null,
         },
@@ -868,6 +905,12 @@ export class TaskService {
     actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<TaskResponseDto> | Exception> {
     const task = await this.getActiveTaskOrThrow(dto.taskId);
+
+    // Check terminal status: cannot clear schedule of completed or cancelled tasks
+    if (this.isTerminalAction(task.statusAction)) {
+      throw new BadRequest("Cannot clear schedule of a completed or cancelled task");
+    }
+
     if (task.lockStatus === TaskLockStatus.OVERDUE_LOCKED) {
       throw new ForbiddenException(
         "Task is locked because it is overdue. Please reschedule before clearing schedule.",
@@ -879,6 +922,7 @@ export class TaskService {
       actorId: actorUserId,
       reason: dto.reason?.trim(),
       oldDueDate: task.dueDate,
+      oldStartDate: task.startDate,
     });
     if (!updatedTask) {
       throw new NotFoundException("Task not found");
@@ -891,6 +935,7 @@ export class TaskService {
       actorId: actorUserId,
       type: TaskActivityType.TASK_SCHEDULE_CLEARED,
       metadata: {
+        oldStartDate: task.startDate?.toISOString() ?? null,
         oldDueDate: task.dueDate?.toISOString() ?? null,
         newDueDate: null,
         oldReminderAt: task.reminderAt?.toISOString() ?? null,
@@ -1061,6 +1106,15 @@ export class TaskService {
     return sentCount;
   }
 
+  /**
+   * Process overdue locks - locks tasks that have passed their deadline.
+   *
+   * NOTE (BE-4): Current batch size is limited to taskScheduleConfig.batchSize (default 100).
+   * For high-volume scenarios with many overdue tasks, consider:
+   * - Running the cron more frequently with smaller batches
+   * - Using a cursor-based approach for pagination
+   * - Implementing a queue-based system for horizontal scaling
+   */
   async processOverdueLocks(now = new Date()): Promise<number> {
     const graceMs = taskScheduleConfig.lockGraceMinutes * 60 * 1000;
     const lockBefore = new Date(now.getTime() - graceMs);
@@ -1147,11 +1201,12 @@ export class TaskService {
   }
 
   /**
-   * Cập nhật `statusAction` cho task.
-   * Quy tắc nghiệp vụ:
-   *  - task phải tồn tại và chưa bị soft delete (handled by `getTaskById`).
-   *  - chỉ user đang là assignee active của task mới được đổi `statusAction`.
-   *  - `statusAction` được Zod validate ở tầng middleware nên không cần check lại.
+   * Update `statusAction` for a task.
+   *
+   * Business rules:
+   *  - task must exist and not be soft deleted (handled by `getTaskById`).
+   *  - only the active assignee of the task can change `statusAction`.
+   *  - `statusAction` is Zod-validated at middleware layer, so we don't re-validate here.
    */
   async updateTaskStatusAction(
     dto: UpdateTaskStatusActionRequestDto,

@@ -3,12 +3,14 @@ import z from "zod";
 
 export class SetTaskScheduleRequestDto {
   taskId: string;
+  startDate?: Date;
   dueDate: Date;
   reminderAt?: Date;
   reason?: string;
 
   constructor(data: SetTaskScheduleRequestDto) {
     this.taskId = data.taskId;
+    this.startDate = data.startDate ? new Date(data.startDate) : undefined;
     this.dueDate = new Date(data.dueDate);
     this.reminderAt = data.reminderAt
       ? new Date(data.reminderAt)
@@ -25,6 +27,7 @@ export const setTaskScheduleRequestParamsSchema = z
 
 export const setTaskScheduleRequestBodySchema = z
   .object({
+    startDate: z.coerce.date().optional(),
     dueDate: z.coerce.date(),
     reminderAt: z.coerce.date().optional(),
     reason: z.string().trim().max(1000).optional(),

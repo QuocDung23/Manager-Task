@@ -137,6 +137,13 @@ export class TaskRepository {
           dueDate: { not: null, gt: now },
           lockStatus: TaskLockStatus.UNLOCKED,
           statusAction: { notIn: [TaskStatusAction.DONE, TaskStatusAction.CANCELLED] },
+          OR: [
+            { reminderAt: { gt: now } },
+            {
+              reminderAt: null,
+              dueDate: { gt: dueSoonBefore ?? now },
+            },
+          ],
         });
       }
 
@@ -574,29 +581,37 @@ export class TaskRepository {
 
   async updateTaskSchedule(args: {
     taskId: string;
+    startDate?: Date | null | undefined;
     dueDate: Date;
     reminderAt?: Date | null;
     actorId?: string;
     reason?: string;
     eventType: TaskScheduleEventType;
     oldDueDate?: Date | null;
+    oldStartDate?: Date | null;
     incrementRescheduleCount?: boolean;
   }): Promise<TaskWithDetails | null> {
     return this.prisma.$transaction(async (tx) => {
-      await tx.tasks.update({
+      // Only write startDate when caller explicitly passed a value (skip if undefined)
+      const data: Prisma.tasksUpdateInput = {
+        dueDate: args.dueDate,
+        reminderAt: args.reminderAt ?? null,
+        reminderSentAt: null,
+        overdueNotifiedAt: null,
+        lockStatus: TaskLockStatus.UNLOCKED,
+        lockedAt: null,
+        lockReason: null,
+        ...(args.incrementRescheduleCount
+          ? { rescheduleCount: { increment: 1 } }
+          : {}),
+      };
+      if (args.startDate !== undefined) {
+        data.startDate = args.startDate;
+      }
+
+      const updated = await tx.tasks.update({
         where: { id: args.taskId },
-        data: {
-          dueDate: args.dueDate,
-          reminderAt: args.reminderAt ?? null,
-          reminderSentAt: null,
-          overdueNotifiedAt: null,
-          lockStatus: TaskLockStatus.UNLOCKED,
-          lockedAt: null,
-          lockReason: null,
-          ...(args.incrementRescheduleCount
-            ? { rescheduleCount: { increment: 1 } }
-            : {}),
-        },
+        data,
       });
 
       await tx.taskScheduleEvents.create({
@@ -608,6 +623,12 @@ export class TaskRepository {
           newDueDate: args.dueDate,
           reason: args.reason,
           metadata: {
+            oldStartDate: args.oldStartDate?.toISOString() ?? null,
+            newStartDate: args.startDate
+              ? args.startDate.toISOString()
+              : args.startDate === null
+                ? null
+                : args.oldStartDate?.toISOString() ?? null,
             reminderAt: args.reminderAt?.toISOString() ?? null,
           },
         },
@@ -628,11 +649,13 @@ export class TaskRepository {
     actorId?: string;
     reason?: string;
     oldDueDate?: Date | null;
+    oldStartDate?: Date | null;
   }): Promise<TaskWithDetails | null> {
     return this.prisma.$transaction(async (tx) => {
       await tx.tasks.update({
         where: { id: args.taskId },
         data: {
+          startDate: null,
           dueDate: null,
           reminderAt: null,
           reminderSentAt: null,

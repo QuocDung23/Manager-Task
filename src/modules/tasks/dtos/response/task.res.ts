@@ -1,5 +1,6 @@
 import { TaskLockStatus, TaskStatus, TaskStatusAction } from "@prisma/client";
 import z from "zod";
+import { taskScheduleConfig } from "@/configs";
 import {
   TaskTagSummaryDto,
   taskTagSummarySchema,
@@ -42,7 +43,9 @@ export class TaskResponseDto {
   name: string;
   description?: string;
   orderTask: number;
+  startDate: Date | null;
   dueDate: Date | null;
+  dueSoonBefore: Date | null;
   reminderAt: Date | null;
   reminderSentAt: Date | null;
   overdueNotifiedAt: Date | null;
@@ -75,7 +78,12 @@ export class TaskResponseDto {
     this.name = data.name;
     this.description = data.description;
     this.orderTask = data.orderTask;
+    this.startDate = data.startDate ?? null;
     this.dueDate = data.dueDate ?? null;
+    const reminderMs = taskScheduleConfig.reminderBeforeMinutes * 60 * 1000;
+    this.dueSoonBefore = this.dueDate
+      ? new Date(this.dueDate.getTime() - reminderMs)
+      : null;
     this.reminderAt = data.reminderAt ?? null;
     this.reminderSentAt = data.reminderSentAt ?? null;
     this.overdueNotifiedAt = data.overdueNotifiedAt ?? null;
@@ -147,10 +155,21 @@ export class TaskResponseDto {
     }
 
     const now = Date.now();
+    const dueDateMs = this.dueDate.getTime();
+
     if (
       this.reminderAt &&
       this.reminderAt.getTime() <= now &&
-      this.dueDate.getTime() > now
+      dueDateMs > now
+    ) {
+      return "due_soon";
+    }
+
+    if (
+      !this.reminderAt &&
+      this.dueSoonBefore &&
+      now >= this.dueSoonBefore.getTime() &&
+      dueDateMs > now
     ) {
       return "due_soon";
     }
@@ -164,7 +183,9 @@ export const taskResponseSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   orderTask: z.number().int(),
+  startDate: z.date().nullable(),
   dueDate: z.date().nullable(),
+  dueSoonBefore: z.date().nullable(),
   reminderAt: z.date().nullable(),
   reminderSentAt: z.date().nullable(),
   overdueNotifiedAt: z.date().nullable(),

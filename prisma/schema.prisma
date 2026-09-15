@@ -353,6 +353,7 @@ model tasks {
   name              String
   description       String
   orderTask         Int              @default(0)
+  startDate         DateTime?        @map("start_date")
   dueDate           DateTime?        @map("due_date")
   reminderAt        DateTime?        @map("reminder_at")
   reminderSentAt    DateTime?        @map("reminder_sent_at")
@@ -379,6 +380,7 @@ model tasks {
   taskScheduleEvents taskScheduleEvents[]
   taskActivities     taskActivities[]
 
+  @@index([startDate, deletedAt])
   @@index([dueDate, deletedAt])
   @@index([lockStatus, dueDate])
   @@index([reminderSentAt, dueDate])
