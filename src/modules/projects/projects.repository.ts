@@ -2,25 +2,34 @@ import { projects } from "@/models";
 import { Prisma, PrismaService } from "../data";
 import { ProjectMemberStatus, ProjectStatus } from "@prisma/client";
 
-type ProjectCreateResult = Prisma.projectsGetPayload<{
-  include: {
-    user: true;
-    projectMembers: {
-      include: {
-        user: true;
-      };
-    };
-  };
-}>;
+// Fix 3 [P1] (Branch A): Include _count.board (soft-delete safe).
+// Lưu ý: Trong schema Prisma, relation từ project tới board được đặt tên `board`
+// (singular field) chứ không phải `boards` — xem prisma/schema.prisma dòng 273.
+const boardCountInclude = {
+  select: {
+    board: { where: { deletedAt: null } },
+  },
+} as const;
 
-type ProjectWithMembersResult = Prisma.projectsGetPayload<{
-  include: {
-    projectMembers: {
-      include: {
-        user: true;
-      };
-    };
-  };
+const projectWithBoardCountInclude = {
+  user: true,
+  projectMembers: {
+    where: {
+      status: ProjectMemberStatus.ACTIVE,
+      deletedAt: null,
+    },
+    include: {
+      user: true,
+    },
+    orderBy: {
+      createdAt: "asc" as const,
+    },
+  },
+  _count: boardCountInclude,
+} as const;
+
+type ProjectWithBoardCount = Prisma.projectsGetPayload<{
+  include: typeof projectWithBoardCountInclude;
 }>;
 
 export class ProjectsRepository {
@@ -70,25 +79,11 @@ export class ProjectsRepository {
     project,
   }: {
     project: Prisma.projectsCreateInput;
-  }): Promise<ProjectCreateResult> {
-    return this.prismaService.projects.create({
-      include: {
-        user: true,
-        projectMembers: {
-          where: {
-            status: ProjectMemberStatus.ACTIVE,
-            deletedAt: null,
-          },
-          include: {
-            user: true,
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-        },
-      },
+  }): Promise<ProjectWithBoardCount> {
+    return (this.prismaService.projects.create({
+      include: projectWithBoardCountInclude,
       data: project,
-    });
+    }) as unknown) as Promise<ProjectWithBoardCount>;
   }
 
   async getProjects({
@@ -103,7 +98,7 @@ export class ProjectsRepository {
     status?: ProjectStatus;
     skip: number;
     take: number;
-  }): Promise<[ProjectWithMembersResult[], number]> {
+  }): Promise<[ProjectWithBoardCount[], number]> {
     const whereCondition = this.getAccessibleProjectsWhere({
       userId,
       name,
@@ -111,28 +106,15 @@ export class ProjectsRepository {
     });
 
     return Promise.all([
-      this.prismaService.projects.findMany({
+      (this.prismaService.projects.findMany({
         where: whereCondition,
         skip,
         take,
-        include: {
-          projectMembers: {
-            where: {
-              status: ProjectMemberStatus.ACTIVE,
-              deletedAt: null,
-            },
-            include: {
-              user: true,
-            },
-            orderBy: {
-              createdAt: "asc",
-            },
-          },
-        },
+        include: projectWithBoardCountInclude,
         orderBy: {
           createdAt: "desc",
         },
-      }),
+      }) as unknown) as Promise<ProjectWithBoardCount[]>,
       this.prismaService.projects.count({
         where: whereCondition,
       }),
@@ -163,30 +145,17 @@ export class ProjectsRepository {
     name?: string;
     status?: ProjectStatus;
     userId?: string;
-  }): Promise<ProjectWithMembersResult | null> {
-    return this.prismaService.projects.findFirst({
+  }): Promise<ProjectWithBoardCount | null> {
+    return (this.prismaService.projects.findFirst({
       where: {
-        id: id,
-        name: name,
-        status: status,
-        userId: userId,
+        id,
+        name,
+        status,
+        userId,
         deletedAt: { equals: null },
       },
-      include: {
-        projectMembers: {
-          where: {
-            status: ProjectMemberStatus.ACTIVE,
-            deletedAt: null,
-          },
-          include: {
-            user: true,
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-        },
-      },
-    });
+      include: projectWithBoardCountInclude,
+    }) as unknown) as Promise<ProjectWithBoardCount | null>;
   }
 
   async updateProject({
@@ -195,28 +164,12 @@ export class ProjectsRepository {
   }: {
     id: string;
     project: Prisma.projectsUpdateInput;
-  }): Promise<ProjectWithMembersResult> {
-    const { ...data } = project;
-    return this.prismaService.projects.update({
-      where: {
-        id: id,
-      },
-      data: data,
-      include: {
-        projectMembers: {
-          where: {
-            status: ProjectMemberStatus.ACTIVE,
-            deletedAt: null,
-          },
-          include: {
-            user: true,
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-        },
-      },
-    });
+  }): Promise<ProjectWithBoardCount> {
+    return (this.prismaService.projects.update({
+      where: { id },
+      data: project,
+      include: projectWithBoardCountInclude,
+    }) as unknown) as Promise<ProjectWithBoardCount>;
   }
 
   async deleteProject({
@@ -227,7 +180,7 @@ export class ProjectsRepository {
     userId: string;
   }): Promise<projects> {
     return this.prismaService.projects.update({
-      where: { id: id, userId: userId },
+      where: { id, userId },
       data: {
         deletedAt: new Date(),
         status: ProjectStatus.INACTIVE,

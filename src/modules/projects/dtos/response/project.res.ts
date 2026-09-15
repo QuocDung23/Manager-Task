@@ -19,6 +19,23 @@ export class ProjectMemberUserDto {
   }
 }
 
+type RawProjectWithCount = {
+  id: string;
+  name: string;
+  description: string;
+  userId: string;
+  projectMembers?: Array<{
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      avatar: string | null;
+    };
+  }>;
+  _count?: { board?: number };
+  [key: string]: unknown;
+};
+
 export class ProjectResponseDto {
   id: string;
   name: string;
@@ -26,27 +43,13 @@ export class ProjectResponseDto {
   userId: string;
   role?: string;
   members?: ProjectMemberUserDto[];
+  boardCount?: number;
 
-  constructor(data: {
-    id: string;
-    name: string;
-    description: string;
-    userId: string;
-    role?: string;
-    projectMembers?: Array<{
-      user: {
-        id: string;
-        name: string;
-        email: string;
-        avatar: string | null;
-      };
-    }>;
-  }) {
+  constructor(data: RawProjectWithCount) {
     this.id = data.id;
     this.name = data.name;
     this.description = data.description;
     this.userId = data.userId;
-    this.role = data.role;
     if (data.projectMembers) {
       this.members = data.projectMembers.map(
         (pm) =>
@@ -58,6 +61,7 @@ export class ProjectResponseDto {
           }),
       );
     }
+    this.boardCount = data._count?.board ?? 0;
   }
 }
 
@@ -75,4 +79,6 @@ export const projectResponseSchema = z.object({
   userId: z.string(),
   role: z.string().optional(),
   members: z.array(projectMemberUserSchema).optional(),
+  // Fix 3 [P1] (Branch A): Thêm boardCount vào schema.
+  boardCount: z.number().int().nonnegative().optional(),
 });
