@@ -65,11 +65,9 @@ export class AuthService {
       },
     };
 
-    const newAccount = await this.authRepository.createAccount({
+    const newAccount = await this.authRepository.createAccountWithRole({
       accounts: account,
     });
-
-    await this.authRepository.addUserRole(newAccount.userId, "USER");
 
     await this.sendOtp({ email: registerDto.email });
 

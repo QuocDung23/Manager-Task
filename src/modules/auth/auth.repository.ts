@@ -57,6 +57,33 @@ export class AuthRepository {
     });
   }
 
+  async createAccountWithRole(
+    args: { accounts: Prisma.accountsCreateInput },
+    roleName: string = "USER",
+  ): Promise<accountsWithPartialRelations> {
+    return this.prismaService.$transaction(async (tx) => {
+      const newAccount = (await tx.accounts.create({
+        include: { user: true },
+        data: args.accounts,
+      })) as accountsWithPartialRelations;
+
+      const role = await tx.roles.findUnique({
+        where: { name: roleName },
+      });
+      if (role) {
+        await tx.userRoles.upsert({
+          where: {
+            userId_roleId: { userId: newAccount.userId, roleId: role.id },
+          },
+          update: {},
+          create: { userId: newAccount.userId, roleId: role.id },
+        });
+      }
+
+      return newAccount;
+    });
+  }
+
   async createToken({
     token,
   }: {

@@ -33,7 +33,7 @@ export const validateRequestMiddleware = (schema: ZodValidationSchema) => {
 			next();
 		} catch (err) {
 			const errorMessage = `${(err as ZodError).issues.map((e) => `${e.path.join(', ')} ${e.message}`).join('; ')}`;
-			throw new OptionalException(StatusCodes.UNPROCESSABLE_ENTITY, errorMessage);
+			throw new OptionalException(StatusCodes.BAD_REQUEST, errorMessage);
 		}
 	};
 };
