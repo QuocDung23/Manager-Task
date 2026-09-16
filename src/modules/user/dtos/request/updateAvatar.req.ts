@@ -1,19 +1,13 @@
 import { ZodValidationSchema } from "@/common";
+import { ALLOWED_AVATAR_MIME_TYPES, MAX_AVATAR_SIZE } from "@/common/constants";
 import z from "zod";
-
-const allowedAvatarMimeTypes = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-] as const;
 
 export const updateAvatarRequestFileSchema = z
   .object({
     fieldname: z.literal("avatar"),
     originalname: z.string().min(1),
-    mimetype: z.enum(allowedAvatarMimeTypes),
-    size: z.number().positive().max(5 * 1024 * 1024),
+    mimetype: z.enum(ALLOWED_AVATAR_MIME_TYPES),
+    size: z.number().positive().max(MAX_AVATAR_SIZE),
   })
   .passthrough();
 

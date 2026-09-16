@@ -27,26 +27,25 @@ export class CloudinaryService {
   }
 
   async uploadAvatar(file: Express.Multer.File, userId: string) {
-    return this.uploadFromBuffer(
-      file.buffer,
-      "manage-task/avatars",
-      {
-        public_id: `avatar_${userId}`,
-        overwrite: true,
-        format: "jpg",
-        transformation: [{ width: 300, height: 300, crop: "fill" }],
-      },
-    );
+    return this.uploadFromBuffer(file.buffer, "manage-task/avatars", {
+      public_id: `avatar_${userId}`,
+      overwrite: true,
+      transformation: [{ width: 300, height: 300, crop: "fill" }],
+    });
   }
 
   async uploadImage(file: Express.Multer.File) {
-    return this.uploadFromBuffer(
-      file.buffer,
-      "manage-task/images",
-    );
+    return this.uploadFromBuffer(file.buffer, "manage-task/images");
   }
 
   async deleteFile(publicId: string) {
     return cloudinary.uploader.destroy(publicId);
+  }
+  extractPublicId(url: string): string | null {
+    if (!url || typeof url !== "string") {
+      return null;
+    }
+    const match = url.match(/\/v\d+\/(.+?)\.\w+$/);
+    return match ? match[1] : null;
   }
 }

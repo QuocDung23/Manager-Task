@@ -1,23 +1,18 @@
 import { Exception } from "@tsed/exceptions";
 import { Request } from "express";
 import multer from "multer";
+import { ALLOWED_AVATAR_MIME_TYPES, MAX_AVATAR_SIZE } from "@/common/constants";
 
-//cấu hình lưu trữ ở ram
+// In-memory storage keeps the uploaded file available as a Buffer for Cloudinary uploads.
 const storage = multer.memoryStorage();
 
-//validate định dạng ảnh
+// Reject any file whose MIME type is not in the shared avatar allow-list.
 const fileFilter = (
   req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ) => {
-  const allowedMimeTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/png",
-    "image/webp",
-  ];
+  const allowedMimeTypes: ReadonlyArray<string> = ALLOWED_AVATAR_MIME_TYPES;
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -26,9 +21,9 @@ const fileFilter = (
 };
 
 export const uploadMiddleware = multer({
-    storage: storage,
-    fileFilter: fileFilter,
-    limits: {
-        fileSize: 5 * 1024 * 1024, 
-    }
-})
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: MAX_AVATAR_SIZE,
+  },
+});

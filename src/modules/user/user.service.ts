@@ -86,6 +86,13 @@ export class UserServicer {
       throw new NotFoundException("userId");
     }
 
+    if (user.avatar && user.avatar.includes("cloudinary")) {
+      const publicId = this.cloudinaryService.extractPublicId(user.avatar);
+      if (publicId) {
+        await this.cloudinaryService.deleteFile(publicId).catch(() => {});
+      }
+    }
+
     const updateAvatar = await this.cloudinaryService.uploadAvatar(
       file,
       userId,
