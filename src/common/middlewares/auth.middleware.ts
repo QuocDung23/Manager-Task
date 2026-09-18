@@ -49,7 +49,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
     const accessToken = cookieToken ?? headerToken;
 
     if (!accessToken) {
-      throw new UnauthorizedException();
+      return next(new UnauthorizedException());
     }
 
     try {
@@ -63,22 +63,24 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         status: UserStatus.ACTIVE,
       });
       if (!userData) {
-        throw new UnauthorizedException();
+        return next(new UnauthorizedException());
       }
 
       const user: MyInfomationResDto = new MyInfomationResDto(userData);
       (req as any).user = user;
     } catch (error: any) {
       if (error instanceof TokenExpiredError) {
-        throw new OptionalException(StatusCodes.UNAUTHORIZED, error.message);
+        return next(
+          new OptionalException(StatusCodes.UNAUTHORIZED, error.message),
+        );
       }
       if (error instanceof JsonWebTokenError) {
-        throw new UnauthorizedException(error.message);
+        return next(new UnauthorizedException(error.message));
       }
       if (error instanceof ClientException) {
-        throw error;
+        return next(error);
       }
-      throw error;
+      return next(error);
     }
     next();
   }
@@ -99,7 +101,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
       ?.split("=")[1];
 
     if (!refreshToken) {
-      throw new UnauthorizedException();
+      return next(new UnauthorizedException());
     }
 
     try {
@@ -112,7 +114,9 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         payloadRefreshToken.userId,
       );
       if (!savedToken || savedToken.refreshToken !== refreshToken) {
-        throw new UnauthorizedException("refresh token is invalid or expired");
+        return next(
+          new UnauthorizedException("refresh token is invalid or expired"),
+        );
       }
 
       const authHeader = req.headers.authorization;
@@ -130,7 +134,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         ) as ITokenPayload;
 
         if (payloadAccessToken.userId !== payloadRefreshToken.userId) {
-          throw new UnauthorizedException("token pair mismatch");
+          return next(new UnauthorizedException("token pair mismatch"));
         }
 
         // if (payloadAccessToken.exp > Date.now() / 1000) {
@@ -146,24 +150,26 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         status: UserStatus.ACTIVE,
       });
       if (!userData) {
-        throw new UnauthorizedException();
+        return next(new UnauthorizedException());
       }
 
       const user = new MyInfomationResDto(userData);
       (req as any).user = user;
     } catch (error) {
       if (error instanceof TokenExpiredError) {
-        throw new OptionalException(StatusCodes.UNAUTHORIZED, error.message);
+        return next(
+          new OptionalException(StatusCodes.UNAUTHORIZED, error.message),
+        );
       }
       if (error instanceof JsonWebTokenError) {
-        throw new UnauthorizedException(error.message);
+        return next(new UnauthorizedException(error.message));
       }
 
       if (error instanceof ClientException) {
-        throw error;
+        return next(error);
       }
 
-      throw error;
+      return next(error);
     }
 
     next();
@@ -276,7 +282,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
    */
   verifyListPermission(...permissions: string[]) {
     return async (req: Request, res: Response, next: NextFunction) => {
-      try {        
+      try {
         const user = (req as any).user;
         if (!user) {
           throw new UnauthorizedException("Unverified");
@@ -289,7 +295,7 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
           params?.id ??
           body?.listId ??
           query?.listId) as string | undefined;
-        
+
         if (!listId) {
           throw new NotFoundException("List Not Found");
         }
@@ -299,7 +305,9 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
           throw new NotFoundException(`List Not Found`);
         }
 
-        const board = await this.boardRepository.getBoardById({ id: list.boardId });
+        const board = await this.boardRepository.getBoardById({
+          id: list.boardId,
+        });
         if (!board) {
           throw new NotFoundException(`Board Not Found`);
         }
@@ -321,7 +329,6 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
     };
   }
 
-
   verifyTaskPermission(...permissions: string[]) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -336,9 +343,9 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
 
         // List-scoped endpoints provide listId directly (e.g. /task/:listId/tasks).
         // Task-scoped endpoints provide task id (e.g. /task/:id), so resolve listId via task.
-        let listId = (params?.listId ??
-          body?.listId ??
-          query?.listId) as string | undefined;
+        let listId = (params?.listId ?? body?.listId ?? query?.listId) as
+          | string
+          | undefined;
 
         if (!listId) {
           const taskId = (params?.taskId ??
@@ -384,11 +391,10 @@ class AuthMiddleware extends BaseAutoBindMiddleware {
         }
 
         next();
-      }
-      catch (error) {
+      } catch (error) {
         next(error);
       }
-    }
+    };
   }
 }
 

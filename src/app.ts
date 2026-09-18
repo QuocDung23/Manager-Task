@@ -12,6 +12,7 @@ import { appEnv } from "./configs";
 import { startAccountCleanupCron } from "./common/service/accountCleanup-cron.service";
 import { startTaskScheduleCron } from "./common/service/taskSchedule-cron.service";
 import { initSocketServer } from "./modules/realtime";
+import { errorHandler } from "./common/middlewares/error-handler.middleware";
 
 const app: Express = express();
 
@@ -60,6 +61,8 @@ app.use("/task", [
 app.use("/notification", Modules.notificationRouter);
 
 app.use(openAPIRouter);
+
+app.use(errorHandler);
 
 startAccountCleanupCron();
 startTaskScheduleCron();

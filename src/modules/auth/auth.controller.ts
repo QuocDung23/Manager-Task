@@ -12,6 +12,26 @@ import { VerifyRequestDto } from "./dtos/requests/verifyAcc.req";
 import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
 import { ChangePasswordRequestDto } from "../user/dtos";
 import { ResetPasswordRequestDto } from "./dtos/requests/resetPass.req";
+import { appEnv } from "@/configs";
+
+function getAuthCookieOptions(maxAgeMs: number) {
+  const isProduction = appEnv.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: maxAgeMs,
+  };
+}
+
+function buildAccessCookie() {
+  return getAuthCookieOptions(30 * 60 * 1000); // 30 minutes
+}
+
+function buildRefreshCookie() {
+  return getAuthCookieOptions(7 * 24 * 60 * 60 * 1000); // 7 days
+}
 
 export class AuthController {
   constructor(private readonly authService = new AuthService()) {}
@@ -35,15 +55,10 @@ export class AuthController {
     }
 
     if (result.data) {
-      res.cookie("accessToken", result.data.accessToken, {
-        httpOnly: true,
-        maxAge: 30 * 60 * 1000,
-      });
-      res.cookie("refreshToken", result.data.refreshToken, {
-        httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
+      const accessOptions = buildAccessCookie();
+      const refreshOptions = buildRefreshCookie();
+      res.cookie("accessToken", result.data.accessToken, accessOptions);
+      res.cookie("refreshToken", result.data.refreshToken, refreshOptions);
     }
 
     return new HttpResponseDto().success(res, result);
@@ -75,15 +90,10 @@ export class AuthController {
     }
 
     if (result.data) {
-      res.cookie("accessToken", result.data.accessToken, {
-        httpOnly: true,
-        maxAge: 30 * 60 * 1000,
-      });
-      res.cookie("refreshToken", result.data.refreshToken, {
-        httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
+      const accessOptions = buildAccessCookie();
+      const refreshOptions = buildRefreshCookie();
+      res.cookie("accessToken", result.data.accessToken, accessOptions);
+      res.cookie("refreshToken", result.data.refreshToken, refreshOptions);
     }
 
     return new HttpResponseDto().created(res, result);
@@ -110,8 +120,8 @@ export class AuthController {
   async logout(req: Request, res: Response): Promise<Response> {
     const userId = (req as any).user.id;
     const result = await this.authService.logout(userId);
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    res.clearCookie("accessToken", { path: "/" });
+    res.clearCookie("refreshToken", { path: "/" });
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
