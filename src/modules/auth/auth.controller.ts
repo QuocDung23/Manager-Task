@@ -13,15 +13,34 @@ import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
 import { ChangePasswordRequestDto } from "../user/dtos";
 import { ResetPasswordRequestDto } from "./dtos/requests/resetPass.req";
 import { appEnv } from "@/configs";
+import type { CookieOptions } from "express";
 
-function getAuthCookieOptions(maxAgeMs: number) {
-  const isProduction = appEnv.NODE_ENV === "production";
+const AUTH_COOKIE_NAMES = ["accessToken", "refreshToken"] as const;
+
+function getCookieSecure(): boolean {
+  return appEnv.NODE_ENV === "production" || appEnv.COOKIE_SECURE;
+}
+
+function getCookieSameSite(): CookieOptions["sameSite"] {
+  return appEnv.COOKIE_SAME_SITE as CookieOptions["sameSite"];
+}
+
+function getAuthCookieOptions(maxAgeMs: number): CookieOptions {
   return {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax" as const,
+    secure: getCookieSecure(),
+    sameSite: getCookieSameSite(),
     path: "/",
     maxAge: maxAgeMs,
+  };
+}
+
+function getAuthCookieRemoveOptions(): CookieOptions {
+  return {
+    httpOnly: true,
+    secure: getCookieSecure(),
+    sameSite: getCookieSameSite(),
+    path: "/",
   };
 }
 
@@ -120,8 +139,10 @@ export class AuthController {
   async logout(req: Request, res: Response): Promise<Response> {
     const userId = (req as any).user.id;
     const result = await this.authService.logout(userId);
-    res.clearCookie("accessToken", { path: "/" });
-    res.clearCookie("refreshToken", { path: "/" });
+    const removeOptions = getAuthCookieRemoveOptions();
+    for (const cookieName of AUTH_COOKIE_NAMES) {
+      res.clearCookie(cookieName, removeOptions);
+    }
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }
