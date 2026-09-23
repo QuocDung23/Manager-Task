@@ -19,7 +19,10 @@ import { RoleRepository } from "../roles/roles.repository";
 import { BoardRole } from "@/common/enums/roles";
 import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
 import { ProjectsRepository } from "../projects/projects.repository";
-import { BoardMemberRepository } from "../boardMember/boardMember.repository";
+import {
+  BoardMemberRepository,
+  type BoardMemberWithUser,
+} from "../boardMember/boardMember.repository";
 import { UpdateBoardRequestDto } from "./dtos/requests/updateBoard.req";
 import { DeleteBoardRequestDto } from "./dtos/requests/deleteBoard.req";
 import { AddMemberBoardRequestDto } from "./dtos/requests/addMemberBoard.req";
@@ -34,6 +37,22 @@ export class BoardService {
     private readonly projectRepository = new ProjectsRepository(),
     private readonly boardMemberRepository = new BoardMemberRepository(),
   ) {}
+
+  private toMemberDto(member: BoardMemberWithUser): BoardMemberResponseDto {
+    return new BoardMemberResponseDto({
+      id: member.id,
+      userId: member.userId,
+      boardId: member.boardId,
+      roleId: member.roleId,
+      status: member.status,
+      user: member.user,
+      role: member.role,
+    });
+  }
+
+  private boardRoleLabel(roleName: string): string {
+    return roleName === BoardRole.BOARD_ADMIN ? "Board admin" : "Board member";
+  }
 
   async getBoardById(
     getBoardById: GetBoardRequestDto,
@@ -286,14 +305,7 @@ export class BoardService {
       realtimeEventService.emitBoardMemberAdded({
         projectId: existingBoard.projectId,
         boardId,
-        member: new BoardMemberResponseDto({
-          id: memberRecord.id,
-          userId: memberRecord.userId,
-          boardId: memberRecord.boardId,
-          roleId: memberRecord.roleId,
-          status: memberRecord.status,
-          user: memberRecord.user,
-        }),
+        member: this.toMemberDto(memberRecord),
         actorId: actorId ?? null,
       });
     }
@@ -329,21 +341,102 @@ export class BoardService {
 
     const members =
       await this.boardMemberRepository.getActiveBoardMembersWithUser(boardId);
-    const data = members.map(
-      (m) =>
-        new BoardMemberResponseDto({
-          id: m.id,
-          userId: m.userId,
-          boardId: m.boardId,
-          roleId: m.roleId,
-          status: m.status,
-          user: m.user,
-        }),
-    );
+    const data = members.map((member) => this.toMemberDto(member));
 
     return {
       success: true,
       data,
+    };
+  }
+
+  async updateBoardMemberRole(
+    boardId: string,
+    userId: string,
+    roleId: string,
+    actorId?: string | null,
+  ): Promise<HttpResponseBodySuccessDto<BoardMemberResponseDto> | Exception> {
+    const board = await this.boardRepository.getBoardById({ id: boardId });
+    if (!board) {
+      throw new NotFoundException("Board not found");
+    }
+
+    const member = await this.boardMemberRepository.getActiveBoardMemberWithUser(
+      boardId,
+      userId,
+    );
+    if (!member) {
+      throw new ForbiddenException("User is not an active board member");
+    }
+
+    const role = await this.rolesRepository.findRoleById(roleId);
+    if (!role || !Object.values(BoardRole).includes(role.name as BoardRole)) {
+      throw new NotFoundException("Board role not found");
+    }
+
+    if (member.userId === board.userId && role.name !== BoardRole.BOARD_ADMIN) {
+      throw new ForbiddenException("Board owner role cannot be changed");
+    }
+
+    const updated = await this.boardMemberRepository.updateActiveMemberRole(
+      boardId,
+      userId,
+      role.id,
+    );
+    if (!updated) {
+      throw new ForbiddenException("User is not an active board member");
+    }
+
+    const memberDto = this.toMemberDto(updated);
+
+    try {
+      realtimeEventService.emitBoardMemberRoleUpdated({
+        projectId: board.projectId,
+        boardId,
+        member: memberDto,
+        actorId: actorId ?? null,
+      });
+    } catch (error) {
+      console.error(
+        "[realtime] emitBoardMemberRoleUpdated failed (HTTP continues)",
+        {
+          boardId,
+          userId,
+          actorId,
+          error,
+        },
+      );
+    }
+
+    const notification = {
+      type: "BOARD_MEMBER_ROLE_CHANGED" as const,
+      title: "Your board role changed",
+      body: `Your role on "${board.name}" is now ${this.boardRoleLabel(role.name)}.`,
+      data: {
+        roleId: role.id,
+        roleName: role.name,
+        boardName: board.name,
+      },
+    };
+    await notificationInboxService.createForRecipients({
+      recipientIds: [updated.userId],
+      actorId,
+      priority: NotificationPriority.DIRECT,
+      projectId: board.projectId,
+      boardId,
+      dedupeKey: (recipientId) =>
+        `board:${boardId}:role:${userId}:${role.id}:${recipientId}`,
+      ...notification,
+    });
+    if (updated.userId !== actorId) {
+      realtimeEventService.emitUserNotification(updated.userId, {
+        ...notification,
+        createdAt: new Date(),
+      });
+    }
+
+    return {
+      success: true,
+      data: memberDto,
     };
   }
 }

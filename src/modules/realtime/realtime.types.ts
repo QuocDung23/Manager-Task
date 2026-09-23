@@ -225,7 +225,9 @@ export type UserNotificationPayload = {
     | "TASK_OVERDUE_LOCKED"
     | "TASK_RESCHEDULED"
     | "TASK_SCHEDULE_UPDATED"
-    | "TASK_UNLOCKED";
+    | "TASK_UNLOCKED"
+    | "PROJECT_MEMBER_ROLE_CHANGED"
+    | "BOARD_MEMBER_ROLE_CHANGED";
   title: string;
   body: string;
   data: Record<string, unknown>;

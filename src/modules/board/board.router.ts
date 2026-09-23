@@ -35,6 +35,10 @@ import {
   getBoardMembersRequestSchema,
   getBoardMembersRequestValidationSchema,
 } from "./dtos/requests/getBoardMembers.req";
+import {
+  updateBoardMemberRoleRequestSchema,
+  updateBoardMemberRoleValidationSchema,
+} from "./dtos/requests/updateBoardMemberRole.req";
 import { ListController } from "../lists/list.controller";
 import {
   createListRequestSchema,
@@ -147,6 +151,25 @@ router.get(
   authMiddleware.verifyBoardPermission(BoardPermissions.VIEW_BOARD),
   validateRequestMiddleware(getBoardMembersRequestValidationSchema),
   boardController.getBoardMembers,
+);
+
+boardRegistry.registerPath({
+  method: "patch",
+  path: "/board/{boardId}/members/{userId}/role",
+  tags: ["Boards"],
+  request: updateBoardMemberRoleRequestSchema,
+  responses: createApiResponse(
+    boardMemberResponseSchema,
+    "Success",
+    StatusCodes.OK,
+  ),
+});
+router.patch(
+  "/:boardId/members/:userId/role",
+  authMiddleware.verifyAccessToken,
+  authMiddleware.verifyBoardPermission(BoardPermissions.UPDATE_ROLE_MEMBER_BOARD),
+  validateRequestMiddleware(updateBoardMemberRoleValidationSchema),
+  boardController.updateMemberRole,
 );
 
 boardRegistry.registerPath({

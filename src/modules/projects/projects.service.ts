@@ -473,18 +473,33 @@ export class ProjectsService {
         },
       );
     }
+    const roleLabel =
+      role.name === ProjectRole.PROJECT_ADMIN ? "Project admin" : "Project member";
+    const notification = {
+      type: "PROJECT_MEMBER_ROLE_CHANGED" as const,
+      title: "Your project role changed",
+      body: `Your role in "${project.name}" is now ${roleLabel}.`,
+      data: {
+        roleId: memberDto.roleId,
+        roleName: role.name,
+        projectName: project.name,
+      },
+    };
     await notificationInboxService.createForRecipients({
       recipientIds: [memberDto.userId],
       actorId: actorUserId,
-      type: "MEMBER_ROLE_CHANGED",
       priority: NotificationPriority.DIRECT,
-      title: "Your project role changed",
-      body: `Your role in "${project.name}" was updated.`,
       projectId,
-      data: { roleId: memberDto.roleId, projectName: project.name },
       dedupeKey: (recipientId) =>
         `project:${projectId}:role:${memberDto.id}:${memberDto.roleId}:${recipientId}`,
+      ...notification,
     });
+    if (memberDto.userId !== actorUserId) {
+      this.realtime.emitUserNotification(memberDto.userId, {
+        ...notification,
+        createdAt: new Date(),
+      });
+    }
 
     return {
       success: true,

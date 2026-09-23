@@ -9,6 +9,7 @@ import { GetBoardRequestDto } from "./dtos/requests/getBoard.req";
 import { UpdateBoardRequestDto } from "./dtos/requests/updateBoard.req";
 import { DeleteBoardRequestDto } from "./dtos/requests/deleteBoard.req";
 import { AddMemberBoardRequestDto } from "./dtos/requests/addMemberBoard.req";
+import { UpdateBoardMemberRoleRequestDto } from "./dtos/requests/updateBoardMemberRole.req";
 
 export class BoardController {
   constructor(private readonly boardService = new BoardService()) {}
@@ -119,6 +120,29 @@ export class BoardController {
       return new HttpResponseDto().exception(res, result);
     }
 
+    return new HttpResponseDto().success(res, result);
+  }
+
+  async updateMemberRole(req: Request, res: Response): Promise<Response> {
+    const actor = (req as any).user;
+    const boardId = req.params.boardId as string;
+    const userId = req.params.userId as string;
+    const { roleId } = req.body as { roleId: string };
+
+    const dto = new UpdateBoardMemberRoleRequestDto({
+      boardId,
+      userId,
+      roleId,
+    });
+    const result = await this.boardService.updateBoardMemberRole(
+      dto.boardId,
+      dto.userId,
+      dto.roleId,
+      actor?.id ?? null,
+    );
+    if (result instanceof Exception) {
+      return new HttpResponseDto().exception(res, result);
+    }
     return new HttpResponseDto().success(res, result);
   }
 

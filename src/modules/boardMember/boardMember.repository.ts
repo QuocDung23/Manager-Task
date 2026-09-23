@@ -1,6 +1,27 @@
 import { boardMembers, BoardMemberStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../data/prisma.client";
 
+const boardMemberWithUserInclude = {
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      avatar: true,
+    },
+  },
+  role: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+} satisfies Prisma.boardMembersInclude;
+
+export type BoardMemberWithUser = Prisma.boardMembersGetPayload<{
+  include: typeof boardMemberWithUserInclude;
+}>;
+
 export class BoardMemberRepository {
   constructor(private readonly prisma = new PrismaService()) {}
 
@@ -55,52 +76,24 @@ export class BoardMemberRepository {
     });
   }
 
-  getActiveBoardMembersWithUser(boardId: string): Promise<
-    Array<
-      boardMembers & {
-        user: {
-          id: string;
-          name: string;
-          email: string;
-          avatar: string | null;
-        };
-      }
-    >
-  > {
+  getActiveBoardMembersWithUser(
+    boardId: string,
+  ): Promise<BoardMemberWithUser[]> {
     return this.prisma.boardMembers.findMany({
       where: {
         boardId,
         status: BoardMemberStatus.ACTIVE,
         deletedAt: null,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
-      },
+      include: boardMemberWithUserInclude,
       orderBy: { createdAt: "asc" },
-    }) as any;
+    });
   }
 
   getActiveBoardMemberWithUser(
     boardId: string,
     userId: string,
-  ): Promise<
-    | (boardMembers & {
-        user: {
-          id: string;
-          name: string;
-          email: string;
-          avatar: string | null;
-        };
-      })
-    | null
-  > {
+  ): Promise<BoardMemberWithUser | null> {
     return this.prisma.boardMembers.findFirst({
       where: {
         boardId,
@@ -108,16 +101,30 @@ export class BoardMemberRepository {
         status: BoardMemberStatus.ACTIVE,
         deletedAt: null,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
+      include: boardMemberWithUserInclude,
+    });
+  }
+
+  async updateActiveMemberRole(
+    boardId: string,
+    userId: string,
+    roleId: string,
+  ): Promise<BoardMemberWithUser | null> {
+    const member = await this.prisma.boardMembers.findFirst({
+      where: {
+        boardId,
+        userId,
+        status: BoardMemberStatus.ACTIVE,
+        deletedAt: null,
       },
-    }) as any;
+      select: { id: true },
+    });
+    if (!member) return null;
+
+    return this.prisma.boardMembers.update({
+      where: { id: member.id },
+      data: { roleId },
+      include: boardMemberWithUserInclude,
+    });
   }
 }

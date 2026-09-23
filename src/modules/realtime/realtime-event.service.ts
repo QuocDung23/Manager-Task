@@ -544,6 +544,7 @@ export class RealtimeEventService {
       this.io
         .to(projectRoom(args.projectId))
         .to(boardRoom(args.boardId))
+        .to(userRoom(args.member.id))
         .emit("board:member_role_updated", payload);
     } catch (error) {
       console.error(
@@ -826,6 +827,7 @@ export class RealtimeEventService {
     try {
       this.io
         .to(projectRoom(args.projectId))
+        .to(userRoom(args.member.userId))
         .emit("project:member_role_updated", payload);
     } catch (error) {
       console.error(
