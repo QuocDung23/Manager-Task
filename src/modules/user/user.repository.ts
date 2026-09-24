@@ -1,35 +1,54 @@
-import { Prisma, UserStatus } from "@prisma/client";
+import { Prisma, UserStatus, users } from "@prisma/client";
 import { PrismaService } from "../data";
-import { users } from "@/models";
 
 export class UserRepository {
   constructor(private readonly prismaService = new PrismaService()) {}
 
   async findUsers({
     name,
+    email,
     status,
     skip,
     take,
   }: {
-    name: string;
+    name?: string;
+    email?: string;
     status?: UserStatus;
     skip: number;
     take: number;
   }): Promise<[users[], number]> {
+    const orConditions: Prisma.usersWhereInput[] = [];
+    if (name) {
+      orConditions.push({
+        name: { contains: name, mode: "insensitive" as const },
+      });
+    }
+    if (email) {
+      orConditions.push({
+        email: { contains: email, mode: "insensitive" as const },
+      });
+    }
+
+    const where: Prisma.usersWhereInput = {
+      ...(status !== undefined ? { status } : {}),
+      ...(orConditions.length > 0 ? { OR: orConditions } : {}),
+      userRoles: {
+        none: {
+          role: {
+            name: "SUPER_ADMIN",
+          },
+        },
+      },
+    };
+
     return Promise.all([
       this.prismaService.users.findMany({
-        where: {
-          name: name,
-          status: status,
-        },
-        skip: skip,
-        take: take,
+        where,
+        skip,
+        take,
       }),
       this.prismaService.users.count({
-        where: {
-          name: name,
-          status: status,
-        },
+        where,
       }),
     ]);
   }
@@ -38,19 +57,19 @@ export class UserRepository {
     userId,
     email,
     status,
-}: {
+  }: {
     userId?: string;
     email?: string;
     status?: UserStatus;
-}): Promise<users | null> {
+  }): Promise<users | null> {
     return this.prismaService.users.findFirst({
-        where: {
-            id: userId,
-            email: email,
-            status: status,
-        },
+      where: {
+        id: userId,
+        email: email,
+        status: status,
+      },
     });
-}
+  }
 
   async updateUser({
     userId,
