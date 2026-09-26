@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD COLUMN "tag_version" INTEGER NOT NULL DEFAULT 0;
