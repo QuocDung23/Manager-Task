@@ -1,8 +1,11 @@
-import { Address } from 'nodemailer/lib/mailer';
+export interface MailAddress {
+	name?: string;
+	address: string;
+}
 
 export class SendEmailDto {
-	sender?: Address;
-	recipients: Address[];
+	sender?: MailAddress;
+	recipients: MailAddress[];
 	subject: string;
 	html: string;
 	text?: string;

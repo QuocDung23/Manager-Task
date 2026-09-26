@@ -27,8 +27,6 @@ export class NotificationService {
     const taskUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/tasks/${taskId}`;
 
     console.log(`[notification] MailConfig:`, {
-      host: MailConfig.host,
-      port: MailConfig.port,
       senderAddress: MailConfig.senderAddress,
       senderName: MailConfig.senderName,
     });
