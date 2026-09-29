@@ -95,7 +95,7 @@ export class UserController {
   async changePassword(req: Request, res: Response): Promise<Response> {
     const userId = (req as any).user.id;
     const dto = new ChangePasswordRequestDto(req.body);
-    const result = await this.authService.changPassword(userId, dto);
+    const result = await this.authService.changePassword(userId, dto);
     if (result instanceof Exception) {
       return new HttpResponseDto().exception(res, result);
     }

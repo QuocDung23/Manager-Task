@@ -21,7 +21,7 @@ import {
 import { UserPermissions } from "@/common/enums/permissions";
 import { createApiResponse } from "@/swagger/openAPIResponseBuilders";
 import {
-  changPasswordResponseSchema,
+  changePasswordResponseSchema,
   getUserResponseSchema,
   myInfomationResponseSchema,
   updateAvatarResponseSchema,
@@ -108,9 +108,10 @@ userRegistry.registerPath({
   method: "patch",
   path: "/user/me/password",
   tags: ["User"],
+  security: [{ bearerAuth: [] }],
   request: changePasswordRequestSchema,
   responses: createApiResponse(
-    changPasswordResponseSchema,
+    changePasswordResponseSchema,
     "Success",
     StatusCodes.OK,
   ),

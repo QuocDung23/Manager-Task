@@ -21,7 +21,7 @@ import { MailService } from "../mail/mail.service";
 import { otpsConfig } from "@/configs";
 import { UserRepository } from "../user/user.repository";
 import { MyInfomationResDto } from "../user/dtos/response/myInfo.res";
-import { ChangePasswordRequestDto } from "../user/dtos";
+import { ChangePasswordRequestDto, ChangePasswordResponseDto } from "../user/dtos";
 import { ResetPasswordRequestDto } from "./dtos/requests/resetPass.req";
 import {
   LogoutResponseDto,
@@ -269,10 +269,10 @@ export class AuthService {
     };
   }
 
-  async changPassword(
+  async changePassword(
     userId: string,
     dto: ChangePasswordRequestDto,
-  ): Promise<HttpResponseBodySuccessDto<void>> {
+  ): Promise<HttpResponseBodySuccessDto<ChangePasswordResponseDto>> {
     const account = await this.authRepository.findAccountByUserId(userId);
     if (!account) {
       throw new NotFoundException("Not Found Account");
@@ -293,7 +293,7 @@ export class AuthService {
 
     return {
       success: true,
-      data: undefined,
+      data: new ChangePasswordResponseDto(),
     };
   }
 
