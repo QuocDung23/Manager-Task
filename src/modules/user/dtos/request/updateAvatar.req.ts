@@ -21,7 +21,7 @@ export const updateAvatarRequestBodySchema = {
       schema: z.object({
         avatar: z
           .string()
-          .openapi({ type: "string", format: "binary", description: "Avatar image file" }),
+          .meta({ type: "string", format: "binary", description: "Avatar image file" }),
       }),
     },
   },
