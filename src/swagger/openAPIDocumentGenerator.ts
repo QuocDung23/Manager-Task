@@ -1,3 +1,4 @@
+import './extendZodWithOpenApi';
 import { OpenApiGeneratorV3, OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 
 import { Registries } from '../modules';

@@ -1,11 +1,9 @@
-import { extendZodWithOpenApi, ResponseConfig } from '@asteasolutions/zod-to-openapi';
+import { ResponseConfig } from '@asteasolutions/zod-to-openapi';
 import { ReferenceObject } from '@asteasolutions/zod-to-openapi/dist/types';
 import { StatusCodes } from 'http-status-codes';
 import { z } from 'zod';
 
 import { ServiceResponseSchema } from '../common';
-
-extendZodWithOpenApi(z);
 
 export const createApiResponse = (
 	schema: z.ZodTypeAny | null,
