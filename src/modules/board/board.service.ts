@@ -28,6 +28,7 @@ import { DeleteBoardRequestDto } from "./dtos/requests/deleteBoard.req";
 import { AddMemberBoardRequestDto } from "./dtos/requests/addMemberBoard.req";
 import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
 import { notificationInboxService } from "@/modules/notification";
+import { MembershipLeaveService } from "@/modules/projectMember/membership-leave.service";
 
 export class BoardService {
   constructor(
@@ -36,7 +37,12 @@ export class BoardService {
     private readonly projectMemberRepository = new ProjectMemberRepo(),
     private readonly projectRepository = new ProjectsRepository(),
     private readonly boardMemberRepository = new BoardMemberRepository(),
+    private readonly membershipLeaveService = new MembershipLeaveService(),
   ) {}
+
+  async leaveBoard(boardId: string, userId: string) {
+    return this.membershipLeaveService.leaveBoard(boardId, userId);
+  }
 
   private toMemberDto(member: BoardMemberWithUser): BoardMemberResponseDto {
     return new BoardMemberResponseDto({

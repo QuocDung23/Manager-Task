@@ -214,6 +214,10 @@ export type ProjectMemberRemovedPayload = RealtimeEnvelope<{
   userId: string;
 }>;
 
+export type ProjectInvitationChangedPayload = RealtimeEnvelope<{
+  invitation: import("@/modules/projects/dtos/response/projectInvitation.res").ProjectInvitationResponseDto;
+}>;
+
 export type ProjectMemberRoleUpdatedPayload = RealtimeEnvelope<{
   projectId: string;
   member: import("@/modules/projects/dtos/response").ProjectMemberResponseDto;
@@ -291,6 +295,7 @@ export type ServerToClientEvents = {
   "project:deleted": (payload: ProjectDeletedPayload) => void;
   "project:member_added": (payload: ProjectMemberAddedPayload) => void;
   "project:member_removed": (payload: ProjectMemberRemovedPayload) => void;
+  "project:invitation_changed": (payload: ProjectInvitationChangedPayload) => void;
   "project:member_role_updated": (
     payload: ProjectMemberRoleUpdatedPayload,
   ) => void;

@@ -154,4 +154,13 @@ export class BoardController {
     }
     return new HttpResponseDto().success(res, result);
   }
+
+  async leaveBoard(req: Request, res: Response): Promise<Response> {
+    const result = await this.boardService.leaveBoard(
+      req.params.boardId as string,
+      (req as any).user.id,
+    );
+    if (result instanceof Exception) return new HttpResponseDto().exception(res, result);
+    return new HttpResponseDto().success(res, result);
+  }
 }
