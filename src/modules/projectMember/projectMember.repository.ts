@@ -1,5 +1,4 @@
 import {
-  BoardMemberStatus,
   Prisma,
   ProjectMemberStatus,
   projectMembers,
@@ -64,21 +63,6 @@ export class ProjectMemberRepo {
     });
   }
 
-  async addMemberToProject(
-    userId: string,
-    projectId: string,
-    roleId: string,
-  ): Promise<ProjectMemberWithDetails> {
-    return this.prisma.projectMembers.create({
-      data: {
-        userId,
-        projectId,
-        roleId,
-      },
-      select: projectMemberDetailsSelect,
-    });
-  }
-
   async getProjectMembers(
     projectId: string,
   ): Promise<ProjectMemberWithDetails[]> {
@@ -122,45 +106,6 @@ export class ProjectMemberRepo {
       },
       data: { roleId },
       select: projectMemberDetailsSelect,
-    });
-  }
-
-  async removeProjectMember(
-    projectId: string,
-    memberId: string,
-    userId: string,
-  ): Promise<ProjectMemberWithDetails> {
-    const deletedAt = new Date();
-
-    return this.prisma.$transaction(async (transaction) => {
-      const member = await transaction.projectMembers.update({
-        where: {
-          id: memberId,
-          projectId,
-          status: ProjectMemberStatus.ACTIVE,
-          deletedAt: null,
-        },
-        data: {
-          status: ProjectMemberStatus.INACTIVE,
-          deletedAt,
-        },
-        select: projectMemberDetailsSelect,
-      });
-
-      await transaction.boardMembers.updateMany({
-        where: {
-          userId,
-          status: BoardMemberStatus.ACTIVE,
-          deletedAt: null,
-          board: { projectId },
-        },
-        data: {
-          status: BoardMemberStatus.INACTIVE,
-          deletedAt,
-        },
-      });
-
-      return member;
     });
   }
 

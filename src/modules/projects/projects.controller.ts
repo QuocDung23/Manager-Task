@@ -139,6 +139,15 @@ export class ProjectController {
     return new HttpResponseDto().success(res, result);
   }
 
+  async leaveProject(req: Request, res: Response): Promise<Response> {
+    const result = await this.projectService.leaveProject(
+      req.params.projectId as string,
+      (req as any).user.id,
+    );
+    if (result instanceof Exception) return new HttpResponseDto().exception(res, result);
+    return new HttpResponseDto().success(res, result);
+  }
+
 async updateProjectMember(req: Request, res: Response): Promise<Response> {
     const { projectId, memberId } = req.params;
     const user = (req as any).user;

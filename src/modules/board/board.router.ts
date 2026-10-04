@@ -39,6 +39,10 @@ import {
   updateBoardMemberRoleRequestSchema,
   updateBoardMemberRoleValidationSchema,
 } from "./dtos/requests/updateBoardMemberRole.req";
+import {
+  leaveBoardRequestSchema,
+  leaveBoardValidationSchema,
+} from "./dtos/requests/leaveBoard.req";
 import { ListController } from "../lists/list.controller";
 import {
   createListRequestSchema,
@@ -151,6 +155,20 @@ router.get(
   authMiddleware.verifyBoardPermission(BoardPermissions.VIEW_BOARD),
   validateRequestMiddleware(getBoardMembersRequestValidationSchema),
   boardController.getBoardMembers,
+);
+
+boardRegistry.registerPath({
+  method: "delete",
+  path: "/board/{boardId}/members/me",
+  tags: ["Boards"],
+  request: leaveBoardRequestSchema,
+  responses: createApiResponse(boardMemberResponseSchema, "Success", StatusCodes.OK),
+});
+router.delete(
+  "/:boardId/members/me",
+  authMiddleware.verifyAccessToken,
+  validateRequestMiddleware(leaveBoardValidationSchema),
+  boardController.leaveBoard,
 );
 
 boardRegistry.registerPath({

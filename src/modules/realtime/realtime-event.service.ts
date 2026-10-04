@@ -28,6 +28,7 @@ import {
   ProjectDeletedPayload,
   ProjectMemberAddedPayload,
   ProjectMemberRemovedPayload,
+  ProjectInvitationChangedPayload,
   ProjectMemberRoleUpdatedPayload,
   TaskActivityCreatedPayload,
   NotificationCreatedPayload,
@@ -40,6 +41,7 @@ import type { BoardResponseDto } from "@/modules/board/dtos/responses/board.res"
 import type { BoardMemberResponseDto } from "@/modules/board/dtos/responses/boardMember.res";
 import type { ProjectResponseDto } from "@/modules/projects/dtos/response/project.res";
 import type { ProjectMemberResponseDto } from "@/modules/projects/dtos/response/projectMember.res";
+import type { ProjectInvitationResponseDto } from "@/modules/projects/dtos/response/projectInvitation.res";
 import type { AppSocketServer } from "./socket.server";
 import { createRealtimeEnvelope } from "./realtime-envelope";
 import { TagResponseDto } from "@/modules/tasks/tag/dtos/response";
@@ -69,6 +71,24 @@ export class RealtimeEventService {
 
   setIO(io: AppSocketServer): void {
     this.io = io;
+  }
+
+  emitProjectInvitationChanged(userId: string, invitation: ProjectInvitationResponseDto, actorId?: string | null): void {
+    const payload: ProjectInvitationChangedPayload = createRealtimeEnvelope({
+      actorId,
+      data: { invitation },
+    });
+    this.emitToRoom(userRoom(userId), "project:invitation_changed", payload);
+  }
+
+  revokeScopedRooms(userId: string, projectId?: string, boardIds: string[] = [], taskIds: string[] = []): void {
+    if (!this.io) return;
+    const rooms = [
+      ...(projectId ? [projectRoom(projectId)] : []),
+      ...boardIds.map(boardRoom),
+      ...taskIds.map(taskRoom),
+    ];
+    if (rooms.length > 0) this.io.in(userRoom(userId)).socketsLeave(rooms);
   }
 
   private emitToRoom<
@@ -513,6 +533,7 @@ export class RealtimeEventService {
       this.io
         .to(projectRoom(args.projectId))
         .to(boardRoom(args.boardId))
+        .to(userRoom(args.userId))
         .emit("board:member_removed", payload);
     } catch (error) {
       console.error("[realtime] board:member_removed event publish failed", {
@@ -803,6 +824,7 @@ export class RealtimeEventService {
     try {
       this.io
         .to(projectRoom(args.projectId))
+        .to(userRoom(args.userId))
         .emit("project:member_removed", payload);
     } catch (error) {
       console.error("[realtime] project:member_removed event publish failed", {

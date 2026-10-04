@@ -23,24 +23,26 @@ import {
   NotificationPriority,
   Prisma,
   ProjectStatus,
-  UserStatus,
 } from "@prisma/client";
 import { GetAllProjectRequestDto } from "./dtos/request/getAllProject.req";
 import { UpdateProjectRequestDto } from "./dtos/request/updateProject.req";
 import { RoleRepository } from "../roles/roles.repository";
 import { ProjectMemberRepo } from "../projectMember/projectMember.repository";
-import { UserRepository } from "../user/user.repository";
 import { ProjectRole } from "@/common/enums/roles";
 import { realtimeEventService } from "@/modules/realtime/realtime-event.service";
 import { notificationInboxService } from "@/modules/notification";
+import { ProjectInvitationService } from "./project-invitation.service";
+import { ProjectInvitationResponseDto } from "./dtos/response/projectInvitation.res";
+import { MembershipLeaveService } from "@/modules/projectMember/membership-leave.service";
 
 export class ProjectsService {
   constructor(
     private readonly projectsRepository = new ProjectsRepository(),
     private readonly rolesRepository = new RoleRepository(),
     private readonly projectMemberRepository = new ProjectMemberRepo(),
-    private readonly userRepository = new UserRepository(),
     private readonly realtime = realtimeEventService,
+    private readonly invitationService = new ProjectInvitationService(),
+    private readonly membershipLeaveService = new MembershipLeaveService(),
   ) {}
 
   async getProjectById(
@@ -257,6 +259,12 @@ export class ProjectsService {
       userId,
     });
 
+    try {
+      await this.invitationService.revokePendingForProject(id, userId);
+    } catch (error) {
+      console.error("[invitation] project deletion cleanup failed", { projectId: id, error });
+    }
+
     const projectDto = new ProjectResponseDto(deletedProject);
 
     try {
@@ -284,110 +292,9 @@ export class ProjectsService {
     projectId: string,
     addMemberDto: AddProjectMemberRequestDto,
     actorUserId?: string,
-  ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
-    const project = await this.projectsRepository.getProject({ id: projectId });
-    if (!project) {
-      throw new NotFoundException("Project not found");
-    }
-
-    const user = await this.userRepository.findUser({
-      userId: addMemberDto.userId,
-      status: UserStatus.ACTIVE,
-    });
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    const memberRole =
-      await this.rolesRepository.findRolesName("PROJECT_MEMBER");
-    if (!memberRole) {
-      throw new InternalServerException();
-    }
-
-    const existingMember = await this.projectMemberRepository.findProjectMember(
-      addMemberDto.userId,
-      projectId,
-    );
-    if (existingMember) {
-      throw new ConflictException("User already in project");
-    }
-
-    await this.projectMemberRepository.addMemberToProject(
-      addMemberDto.userId,
-      projectId,
-      memberRole.id,
-    );
-
-    const member = await this.projectMemberRepository.findProjectMember(
-      addMemberDto.userId,
-      projectId,
-    );
-    if (!member) {
-      throw new InternalServerException();
-    }
-
-    const refreshedProject = await this.projectsRepository.getProject({
-      id: projectId,
-    });
-    if (!refreshedProject) {
-      throw new InternalServerException();
-    }
-
-    const memberDto = new ProjectMemberResponseDto({
-      ...member,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-      },
-      role: { id: memberRole.id, name: memberRole.name },
-    } as any);
-    const projectDto = new ProjectResponseDto(refreshedProject as any);
-
-    try {
-      // Fan-out tới user room của member mới + owner + các member ACTIVE hiện tại
-      // để user mới thấy project xuất hiện trong list, các member khác patch
-      // members cache nếu đang mở detail.
-      const recipientSet = new Set<string>([memberDto.userId]);
-      const memberRecipients =
-        await this.projectsRepository.getActiveProjectMemberUserIds(projectId);
-      for (const id of memberRecipients) recipientSet.add(id);
-      this.realtime.emitProjectMemberAdded({
-        projectId,
-        project: projectDto,
-        member: memberDto,
-        actorId: actorUserId ?? null,
-        recipientUserIds: Array.from(recipientSet),
-      });
-    } catch (error) {
-      console.error(
-        "[realtime] emitProjectMemberAdded failed (HTTP continues)",
-        {
-          projectId,
-          memberId: memberDto.id,
-          actorUserId,
-          error,
-        },
-      );
-    }
-    await notificationInboxService.createForRecipients({
-      recipientIds: [memberDto.userId],
-      actorId: actorUserId,
-      type: "PROJECT_MEMBER_ADDED",
-      priority: NotificationPriority.DIRECT,
-      title: "You were added to a project",
-      body: `You now have access to "${project.name}".`,
-      projectId,
-      data: { projectName: project.name },
-      dedupeKey: (recipientId) =>
-        `project:${projectId}:member-added:${memberDto.id}:${recipientId}`,
-    });
-
-    return {
-      success: true,
-      data: memberDto,
-    };
+  ): Promise<HttpResponseBodySuccessDto<ProjectInvitationResponseDto> | Exception> {
+    if (!actorUserId) throw new ForbiddenException("Unverified");
+    return this.invitationService.invite(projectId, addMemberDto.userId, actorUserId);
   }
 
   async getProjectMembers(
@@ -512,64 +419,14 @@ export class ProjectsService {
     memberId: string,
     actorUserId?: string,
   ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
-    const project = await this.projectsRepository.getProject({ id: projectId });
-    if (!project) {
-      throw new NotFoundException("Project not found");
-    }
+    if (!actorUserId) throw new ForbiddenException("Unverified");
+    return this.membershipLeaveService.removeProjectMember(projectId, memberId, actorUserId);
+  }
 
-    const member = await this.projectMemberRepository.getProjectMemberById(
-      projectId,
-      memberId,
-    );
-    if (!member) {
-      throw new NotFoundException("Project member not found");
-    }
-
-    if (member.userId === project.userId) {
-      throw new ForbiddenException("Project owner cannot be removed");
-    }
-
-    const removedMember =
-      await this.projectMemberRepository.removeProjectMember(
-        projectId,
-        memberId,
-        member.userId,
-      );
-
-    try {
-      this.realtime.emitProjectMemberRemoved({
-        projectId,
-        memberId,
-        userId: member.userId,
-        actorId: actorUserId ?? null,
-      });
-    } catch (error) {
-      console.error(
-        "[realtime] emitProjectMemberRemoved failed (HTTP continues)",
-        {
-          projectId,
-          memberId,
-          actorUserId,
-          error,
-        },
-      );
-    }
-    await notificationInboxService.createForRecipients({
-      recipientIds: [member.userId],
-      actorId: actorUserId,
-      type: "MEMBER_REMOVED",
-      priority: NotificationPriority.DIRECT,
-      title: "You were removed from a project",
-      body: `You no longer have access to "${project.name}".`,
-      projectId,
-      data: { projectName: project.name },
-      dedupeKey: (recipientId) =>
-        `project:${projectId}:removed:${memberId}:${recipientId}`,
-    });
-
-    return {
-      success: true,
-      data: new ProjectMemberResponseDto(removedMember),
-    };
+  async leaveProject(
+    projectId: string,
+    userId: string,
+  ): Promise<HttpResponseBodySuccessDto<ProjectMemberResponseDto> | Exception> {
+    return this.membershipLeaveService.leaveProject(projectId, userId);
   }
 }

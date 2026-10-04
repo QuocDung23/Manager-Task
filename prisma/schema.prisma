@@ -95,6 +95,14 @@ enum ProjectMemberStatus {
   INACTIVE @map("inactive")
 }
 
+enum ProjectInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+  EXPIRED
+}
+
 enum BoardMemberStatus {
   ACTIVE   @map("active")
   INACTIVE @map("inactive")
@@ -157,6 +165,8 @@ model users {
   board          boards[]
   // socialAccounts socialAccounts[]
   projectMembers projectMembers[]
+  invitationsReceived projectInvitations[] @relation("ProjectInvitationInvitee")
+  invitationsSent projectInvitations[] @relation("ProjectInvitationInviter")
   boardMembers   boardMembers[]
   userRoles      userRoles[]
 
@@ -205,6 +215,7 @@ model roles {
   userRoles       userRoles[]
   rolePermissions rolePermissions[]
   projectMembers  projectMembers[]
+  projectInvitations projectInvitations[]
   boardMembers    boardMembers[]
 
   @@map("roles")
@@ -270,6 +281,7 @@ model projects {
   deletedAt DateTime? @map("deleted_at")
 
   projectMembers projectMembers[]
+  projectInvitations projectInvitations[]
   board          boards[]
 
   @@map("projects")
@@ -290,6 +302,27 @@ model projectMembers {
   deletedAt DateTime? @map("deleted_at")
 
   @@map("projectMembers")
+}
+
+model projectInvitations {
+  id String @id @default(uuid())
+  projectId String @map("project_id")
+  project projects @relation(fields: [projectId], references: [id])
+  inviteeId String @map("invitee_id")
+  invitee users @relation("ProjectInvitationInvitee", fields: [inviteeId], references: [id])
+  invitedById String @map("invited_by_id")
+  invitedBy users @relation("ProjectInvitationInviter", fields: [invitedById], references: [id])
+  roleId String @map("role_id")
+  role roles @relation(fields: [roleId], references: [id])
+  status ProjectInvitationStatus @default(PENDING)
+  expiresAt DateTime @map("expires_at")
+  respondedAt DateTime? @map("responded_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([inviteeId, status, createdAt])
+  @@index([projectId, status])
+  @@map("projectInvitations")
 }
 
 model boards {
